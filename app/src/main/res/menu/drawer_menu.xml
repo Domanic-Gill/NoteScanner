@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single"> <!--makes sure we can only select one item from group -->
+        <item
+            android:id="@+id/nav_photo"
+            android:icon="@drawable/ic_add_from_photo"
+            android:title="Add note from photo" />
+        <item
+            android:id="@+id/nav_gallery"
+            android:icon="@drawable/ic_add_from_gallery"
+            android:title="Add note from gallery" />
+        <item
+            android:id="@+id/nav_normal_note"
+            android:icon="@drawable/ic_add_normal_note"
+            android:title="Add note without picture" />
+    </group>
+
+    <!-- these items won't stay selected when clicked -->
+    <item android:title="Communicate">
+        <menu>
+            <item
+                android:id="@+id/tutorial"
+                android:icon="@drawable/ic_tutorial"
+                android:title="Tutorial" />
+            <item
+                android:id="@+id/nav_settings"
+                android:icon="@drawable/ic_settings"
+                android:title="Settings" />
+            <item
+                android:id="@+id/nav_about_us"
+                android:icon="@drawable/ic_about_us"
+                android:title="About us" />
+            <item
+                android:id="@+id/nav_dev_options"
+                android:icon="@drawable/ic_dev_options"
+                android:title="Developer Options" />
+        </menu>
+    </item>
+
+</menu>
