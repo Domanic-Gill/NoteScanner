@@ -1,0 +1,2 @@
+# NoteScanner
+Note scanning app
