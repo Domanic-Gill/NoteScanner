@@ -67,7 +67,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:id="@+id/fabItem3"
-                    app:fab_label="Add from camera"
+                    app:fab_label="Add normal note"
                     app:fab_size="mini"
                     android:src="@drawable/ic_add_normal_note_w"
                     android:onClick="onClick"

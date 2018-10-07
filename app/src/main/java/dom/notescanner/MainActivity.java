@@ -13,9 +13,12 @@ import com.github.clans.fab.FloatingActionButton;
 import com.github.clans.fab.FloatingActionMenu;
 
 public class MainActivity extends AppCompatActivity {
-    private DrawerLayout drawer;
-    FloatingActionMenu floatingActionMenu;
-    FloatingActionButton fabAddPhoto, fabAddGallery, fabaddNote;
+    //Navigation drawer
+    private DrawerLayout drawer;        //navigation draw
+
+    //fab menu and respective buttons below
+    private FloatingActionMenu floatingActionMenu;
+    private FloatingActionButton fabAddPhoto, fabAddGallery, fabaddNote;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,10 +52,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClick (View v) {
-        if(v.getId() == R.id.fabItem1 || v.getId() == R.id.nav_photo) {
-            Toast.makeText(MainActivity.this,"photo click",Toast.LENGTH_SHORT).show();
-        } else {
-            floatingActionMenu.close(true);
+        switch (v.getId()) {
+            case R.id.fabItem1:
+                Toast.makeText(MainActivity.this,"photo add", Toast.LENGTH_SHORT).show();
+            case R.id.fabItem2:
+                Toast.makeText(MainActivity.this,"gallery add", Toast.LENGTH_SHORT).show();
+            case R.id.fabItem3:
+                Toast.makeText(MainActivity.this,"Normal add", Toast.LENGTH_SHORT).show();
         }
     }
 }
