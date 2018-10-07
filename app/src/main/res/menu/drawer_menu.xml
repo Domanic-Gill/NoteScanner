@@ -8,6 +8,7 @@
             android:id="@+id/nav_photo"
             android:icon="@drawable/ic_add_from_photo"
             android:title="Add note from photo" />
+
         <item
             android:id="@+id/nav_gallery"
             android:icon="@drawable/ic_add_from_gallery"
