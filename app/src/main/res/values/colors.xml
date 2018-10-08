@@ -5,4 +5,5 @@
     <color name="colorAccent">#D81B60</color> <!-- FF4081 for orange -->
     <color name="colorText">#212121</color>
     <color name="colorBackground">#FFFFFF</color>
+    <color name="colorBackgroundGrey">#D3D3D3</color>
 </resources>
