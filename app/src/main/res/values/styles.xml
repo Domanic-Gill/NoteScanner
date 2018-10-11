@@ -3,11 +3,14 @@
     <!-- Base application theme. -->
     <!-- to remove action bar for all activities use NoActionBar
      Originally DarkActionBar-->
-    <style name="AppTheme" parent="Base.Theme.AppCompat.Light.DarkActionBar">
+    <style name="AppTheme" parent="Base.Theme.AppCompat.Light">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="windowActionBar">true</item>    <!-- why can't we use noactionbar?? -->
+        <item name="windowNoTitle">true</item>
+
     </style>
 
     <!-- remove action bar for one particular activity -->

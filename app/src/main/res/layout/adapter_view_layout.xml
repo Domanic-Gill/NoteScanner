@@ -3,40 +3,23 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_weight="100"
-    android:orientation="horizontal">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:id="@+id/note_tv1"
-        android:textAlignment="center"
-        android:gravity="center"
-        android:text="tv1"
-        android:layout_weight="66.6"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_weight="33.3">
+    android:orientation="vertical">
 
         <TextView
+            android:id="@+id/note_title"
             android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:id="@+id/note_tv2"
-            android:gravity="center"
-            android:text="tv2"/>
+            android:layout_height="20dp"
+            android:gravity="start"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:text="tv2" />
 
         <TextView
+            android:id="@+id/note_body"
             android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:id="@+id/note_tv3"
-            android:gravity="center"
-            android:text="tv3"/>
-
-
-    </LinearLayout>
-
+            android:layout_height="40dp"
+            android:gravity="start"
+            android:maxLines="2"
+            android:text="tv3" />
 
 </LinearLayout>

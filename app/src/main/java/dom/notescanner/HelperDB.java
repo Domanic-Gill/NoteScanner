@@ -12,7 +12,7 @@ public class HelperDB extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE recipes (" +
+        db.execSQL("CREATE TABLE notes (" +
                 "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "noteTitle VARCHAR(128), " +
                 "noteBody VARCHAR(2048)" +
@@ -21,7 +21,7 @@ public class HelperDB extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS recipes;");
+        db.execSQL("DROP TABLE IF EXISTS notes;");
         onCreate(db);
     }
 }

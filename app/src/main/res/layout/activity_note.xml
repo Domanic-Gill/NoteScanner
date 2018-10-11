@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="?android:attr/actionBarSize"
         android:background="@color/colorPrimary"
-        android:id="@+id/toolbar"
+        android:id="@+id/note_toolbar"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         android:elevation="4dp"/>
@@ -28,17 +28,21 @@
         <EditText
             android:layout_width="match_parent"
             android:layout_height="30dp"
+            android:id="@+id/note_title"
             android:layout_marginBottom="10dp"
             android:background="@color/colorBackground"
             android:hint="Title"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:inputType="textAutoComplete"/>
 
         <EditText
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:id="@+id/note_body"
             android:background="@color/colorBackground"
             android:hint="Note body"
-            android:textStyle="bold" />
+            android:inputType="textMultiLine"
+            android:gravity="start" />
 
     </LinearLayout>
 
