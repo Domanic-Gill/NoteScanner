@@ -18,8 +18,9 @@ import android.widget.Toast;
 
 import com.github.clans.fab.FloatingActionButton;
 import com.github.clans.fab.FloatingActionMenu;
-import umich.cse.yctung.androidlibsvm.LibSVM;
 
+
+//TODO - implement list view properly
 public class MainActivity extends AppCompatActivity {
     //Navigation drawer
     private DrawerLayout drawer;
@@ -35,7 +36,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        LibSVM svm = new LibSVM();
+
         //find and set fab buttons
         floatingActionMenu = findViewById(R.id.floatingActionMenu);
         floatingActionMenu.setClosedOnTouchOutside(true);
@@ -101,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
 
         Cursor cursor = getContentResolver().query(ConProviderContract.NOTES_URI, projection, null, null, null);
         simpleCursorAdapter = new SimpleCursorAdapter(this, R.layout.adapter_view_layout, cursor, displayCols, colResIds, 0);
-        
+
         final ListView noteListview = findViewById(R.id.lv_notes);
         noteListview.setAdapter(simpleCursorAdapter);
         noteListview.setOnItemClickListener(new AdapterView.OnItemClickListener(){
