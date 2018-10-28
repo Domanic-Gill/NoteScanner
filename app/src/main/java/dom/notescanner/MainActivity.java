@@ -3,6 +3,7 @@ package dom.notescanner;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -25,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
     //Navigation drawer
     private DrawerLayout drawer;
     private int lastNoteID = 0; //id of the final note of the ListView
+    public static final int PICK_IMAGE = 100;
 
     //fab menu and respective buttons below
     private FloatingActionMenu floatingActionMenu;
@@ -60,8 +62,13 @@ public class MainActivity extends AppCompatActivity {
         switch (v.getId()) {
             case R.id.fabItem1:
                 Toast.makeText(MainActivity.this,"photo add", Toast.LENGTH_SHORT).show();
+                break;
             case R.id.fabItem2:
-                Toast.makeText(MainActivity.this,"gallery add", Toast.LENGTH_SHORT).show();
+                Intent imageIntent = new Intent();
+                imageIntent.setType("image/*");
+                imageIntent.setAction(Intent.ACTION_GET_CONTENT);
+                startActivityForResult(Intent.createChooser(imageIntent, "Select Picture"), PICK_IMAGE);
+                break;
             case R.id.fabItem3:
                 queryProvider();
                 Intent intent = new Intent(MainActivity.this, NoteActivity.class);
@@ -71,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
                 bundle.putInt("noteID", lastNoteID+1);
                 intent.putExtras(bundle);
                 startActivityForResult(intent, 1);
+                break;
         }
     }
 
@@ -78,6 +86,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode,int resultCode, Intent data) {
         if (requestCode == 1 && resultCode == RESULT_OK)    //update db if changes made
             queryProvider();
+
+        if (requestCode == PICK_IMAGE) {
+            if (data != null) {
+                Uri uri = data.getData();
+                Intent intent = new Intent(MainActivity.this, GalleryActivity.class);
+                intent.putExtra("uri", uri.toString());
+                startActivity(intent);
+            }
+        }
     }
 
     /*querying content provider and providing a clickable list of recipes*/
