@@ -30,7 +30,6 @@ public class MainActivity extends AppCompatActivity {
 
     //fab menu and respective buttons below
     private FloatingActionMenu floatingActionMenu;
-    private FloatingActionButton fabAddPhoto, fabAddGallery, fabaddNote;
 
     SimpleCursorAdapter simpleCursorAdapter;
 
@@ -42,10 +41,6 @@ public class MainActivity extends AppCompatActivity {
         //find and set fab buttons
         floatingActionMenu = findViewById(R.id.floatingActionMenu);
         floatingActionMenu.setClosedOnTouchOutside(true);
-        fabAddPhoto = findViewById(R.id.fabItem1);
-        fabAddGallery = findViewById(R.id.fabItem2);
-        fabaddNote = findViewById(R.id.fabItem3);
-
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -167,7 +162,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.dispatchTouchEvent(event);
     }
-
 
     @Override
     public void onBackPressed() {
