@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#008577</color>
-    <color name="colorPrimaryDark">#00574B</color>
-    <color name="colorAccent">#D81B60</color> <!-- FF4081 for orange -->
+    <color name="colorPrimary">#689f38</color> <!--#008577 original -->
+    <color name="colorPrimaryDark">#387002</color> <!-- 00574B for original -->
+    <color name="colorAccent">#99d066</color> <!-- D81B60 for original, FF4081 for orange -->
     <color name="colorText">#212121</color>
     <color name="colorBackground">#FFFFFF</color>
-    <color name="colorBackgroundGrey">#D3D3D3</color>
+    <color name="colorBackgroundGrey">#F2F2F2</color>
+    <color name="colorBackgroundGreyLight">#f8f8f8</color>
 </resources>

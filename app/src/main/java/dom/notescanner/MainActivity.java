@@ -10,6 +10,7 @@ import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
@@ -20,9 +21,30 @@ import android.widget.Toast;
 import com.github.clans.fab.FloatingActionButton;
 import com.github.clans.fab.FloatingActionMenu;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.OpenCVLoader;
+
 
 //TODO - implement list view properly
 public class MainActivity extends AppCompatActivity {
+    boolean openCVLoaded;
+    private static final String TAG = "MainActivity";
+    BaseLoaderCallback mCallBack = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch (status) {
+                case BaseLoaderCallback.SUCCESS: {
+                    Log.i(TAG, "OpenCV loaded successfully");
+                    openCVLoaded =  true;
+                    break;
+                }
+                default: {
+                    super.onManagerConnected(status);
+                    break;
+                }
+            }
+        }
+    };
     //Navigation drawer
     private DrawerLayout drawer;
     private int lastNoteID = 0; //id of the final note of the ListView
@@ -37,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_13, this, mCallBack);
 
         //find and set fab buttons
         floatingActionMenu = findViewById(R.id.floatingActionMenu);

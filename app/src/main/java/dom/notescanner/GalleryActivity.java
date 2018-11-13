@@ -18,178 +18,104 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.ml.CvSVM;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.List;
 
 import static java.security.AccessController.getContext;
 
 public class GalleryActivity extends AppCompatActivity {
     private static final String TAG = "GalleryActivity";
-    private static final float AR_1610 = (float) 1.6;        //aspect ratio 16:10
-    private static final float AR_43 = (float) 1.33;          //aspect ratio 4:3
-    private
-    ImageView imageView;
-    Bitmap inputBitmap;
-
-    int scaleRows, scaleCols;
-    float aspectRatio;
-    boolean openCVLoaded = false;
-
-    BaseLoaderCallback mCallBack = new BaseLoaderCallback(this) {
-        @Override
-        public void onManagerConnected(int status) {
-            switch (status) {
-                case BaseLoaderCallback.SUCCESS: {
-                    Log.i(TAG, "OpenCV loaded successfully");
-                    openCVLoaded =  true;
-                    break;
-                }
-                default: {
-                    super.onManagerConnected(status);
-                    break;
-                }
-            }
-        }
-    };
+    ImageView imgPrevView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gallery);
-        imageView = findViewById(R.id.image_view);
-        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_13, this, mCallBack);
-        new AsyncProcessImage(this).execute();
+        imgPrevView = findViewById(R.id.image_view);
+
+        Bundle bundle = getIntent().getExtras();
+        if (bundle != null) {
+            Uri uri = Uri.parse(bundle.getString("uri"));
+            new PreProcImgAsync(this, uri).execute();
+        } else {
+            Toast.makeText(GalleryActivity.this,"Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
+        }
 
     }
 
     //takes matrix and outputs it to view
-    public void displayMat(Mat m, ImageView v) {
-        Bitmap bmpOut = Bitmap.createBitmap(m.cols(), m.rows(), Bitmap.Config.ARGB_8888);
-        Imgproc.cvtColor(m, m, Imgproc.COLOR_GRAY2RGBA, 4);
-        Utils.matToBitmap(m, bmpOut);
-        v.setImageBitmap(bmpOut);
-        v.invalidate();
+    public void displayMat(Mat m, boolean isRGB) {
+        if (isRGB) {
+            final Bitmap bmpRGB = Bitmap.createBitmap(m.cols(), m.rows(), Bitmap.Config.RGB_565);
+            Utils.matToBitmap(m, bmpRGB);
+            imgPrevView.setImageBitmap(bmpRGB);
+            imgPrevView.invalidate();
+        } else {
+            Bitmap bmpGRAY = Bitmap.createBitmap(m.cols(), m.rows(), Bitmap.Config.ARGB_8888);
+            Imgproc.cvtColor(m, m, Imgproc.COLOR_GRAY2RGBA, 4);
+            Utils.matToBitmap(m, bmpGRAY);
+            imgPrevView.setImageBitmap(bmpGRAY);
+            imgPrevView.invalidate();
+        }
     }
 
-     private class AsyncProcessImage extends AsyncTask<String, Void, Void>
+    private class PreProcImgAsync extends AsyncTask<String, Mat, Void>
     {
+        private Uri mUri;   //URI of  the image
         private final Context mContext;
+        Bitmap inputBitmap; //Bitmap of the Image
+        Mat finalMat;   //final Matrix to display to view back in Gallery
 
-        AsyncProcessImage(Context c) {
+        PreProcImgAsync(Context c, Uri uri) {
             mContext = c;
+            mUri = uri;
         }
+
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            Log.d(GalleryActivity.TAG, "==================\nStart of SVM PREDICT\n==================");
         }
 
         @Override
         protected Void doInBackground(String... params) {
-            //LibSVM.getInstance().predict(TextUtils.join(" ", params));
-            //get the image
-            Bundle bundle = getIntent().getExtras();
-            Uri uri = Uri.parse(bundle.getString("uri"));
+
+            Mat inMat = new Mat();  //Image matrix
+
             try {   //get the bitmap from URI
-                inputBitmap = MediaStore.Images.Media.getBitmap(mContext.getContentResolver(), uri);
+                inputBitmap = MediaStore.Images.Media.getBitmap(mContext.getContentResolver(), mUri);    //do with strong private reference to application context
             } catch (IOException e) {
                 e.printStackTrace();
             }
 
-            //change image to bitmap and set aspect ratio
-            Mat inMat = new Mat();
+            //change image to OpenCV matrix
             Utils.bitmapToMat(inputBitmap, inMat);
-            aspectRatio = (float) inMat.rows() / (float) inMat.cols();
-            if (aspectRatio < 1) {
-                aspectRatio = (float) inMat.cols() / (float) inMat.rows();
-            }
 
-            //Scale image to 1080 for easier pre-processing
-            //if image is HD+ portrait image then rescale to 1080p, else for landscape
-            if (inMat.rows() > inMat.cols() && inMat.rows() > 1920) {   //if image portrait
-                if (aspectRatio > 1.7) {                //if image 16:9
-                    scaleRows = inMat.rows() - 1920;
-                    scaleCols = inMat.cols() - 1080;
-                } else {                                //if image 4:3
-                    scaleRows = inMat.rows() - 1856;
-                    scaleCols = inMat.cols() - 1392;
-                }
-                Size size = new Size(inMat.cols() - scaleCols,
-                        inMat.rows() - scaleRows);
-                Imgproc.resize(inMat, inMat, size);
-            } else if (inMat.rows() < inMat.cols() && inMat.cols() > 1920) {    //if image landscape
-                if (aspectRatio > 1.7) {                //if image 16:9
-                    scaleRows = inMat.rows() - 1080;
-                    scaleCols = inMat.cols() - 1920;
-                } else {                                //if image 4:3
-                    scaleRows = inMat.rows() - 1392;
-                    scaleCols = inMat.cols() - 1856;
-                }
-                Size size = new Size(inMat.cols() - scaleCols,
-                        inMat.rows() - scaleRows);
-                Imgproc.resize(inMat, inMat, size);
-            }
-            Bitmap bmpOut = Bitmap.createBitmap(inMat.cols(), inMat.rows(), Bitmap.Config.ARGB_8888);
-            Imgproc.cvtColor(inMat, inMat, Imgproc.CV_RGBA2mRGBA, 4);
-            Utils.matToBitmap(inMat, bmpOut);
-            imageView.setImageBitmap(bmpOut);
-            imageView.invalidate();
-            //SystemClock.sleep(2000);
-            /*------------------------------------NOISE REDUCTION------------------------------------*/
-            //threshold image to remove noise and invert image for line removal
-            Imgproc.cvtColor(inMat, inMat, Imgproc.COLOR_BGR2GRAY); //change to greyscale
-            Imgproc.adaptiveThreshold(inMat, inMat, 255,
-                    Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
-                    Imgproc.THRESH_BINARY, 15, 5); //originally blocksize = 11, c = 2
-            // Imgproc.erode(inputMatrix, inputMatrix, Mat.ones(new Size(2,2), 0));
-            //Imgproc.erode(inputMatrix, inputMatrix, Mat.ones(new Size(3,3), 0));
-            // Imgproc.dilate(inputMatrix, inputMatrix, Mat.ones(new Size(3,3), 0));
+            OcrProcessor ocrProc = new OcrProcessor(inMat);
+            inMat = ocrProc.scaleMat(inMat);    //downscale any high resolution images
+            publishProgress(inMat);             //show downscaled image to ImageView
 
-            /*-------------------------------------LINE REMOVAL-------------------------------------*/
-            Core.bitwise_not(inMat, inMat); //invert the matrix
-            Mat hor = inMat.clone();
-            Mat ver = inMat.clone();
+            finalMat = ocrProc.removeNoise(inMat,true); //remove noise from Image
 
-            //30 sharper on 16:9, 30 on 4:3 is too low so we double it
-            int hs = (aspectRatio >= AR_1610) ? hor.cols() / 30 : hor.cols() / 60;
-            System.out.println("HS = " + hs);
-            Mat horStruct = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(hs, 1));
-            Imgproc.erode(hor, hor, horStruct, new Point(-1, -1), 1);
-            Imgproc.dilate(hor, hor, horStruct, new Point(-1, -1), 1);
-            Core.subtract(inMat, hor, inMat);
-
-            //now remove vertical lines (column bar, etc)
-            int vs = (aspectRatio >= AR_1610) ? hor.rows() / 30 : hor.rows() / 60;
-            Mat verStruct = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(1,vs));
-            Imgproc.erode(ver, ver, verStruct, new Point (-1, -1), 1);
-            Imgproc.dilate(ver, ver, verStruct, new Point (-1, -1), 1);
-            Core.subtract(inMat, ver, inMat);
-
-            Core.bitwise_not(inMat, inMat);
-            Imgproc.adaptiveThreshold(inMat, inMat, 255,
-                    Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
-                    Imgproc.THRESH_BINARY, 11, 2); //originally blocksize = 11, c = 2
-
-
-            displayMat(inMat, imageView);
             return null;
         }
         @Override
         protected void onPostExecute(Void result) {
-
-            //Toast.makeText(getContext(), "SVM Predict has executed successfully!", Toast.LENGTH_LONG).show();
-            //Log.d(ContainerActivity.TAG, "==================\nEnd of SVM PREDICT\n==================");
-           // Utility.readLogcat(getContext(), "SVM-Predict Results");
+            displayMat(finalMat, false);
         }
 
         @Override
-        protected void onProgressUpdate(Void... values) {
+        protected void onProgressUpdate(Mat... values) {
             super.onProgressUpdate(values);
+            displayMat(values[0], true);
         }
 
         @Override
@@ -198,5 +124,6 @@ public class GalleryActivity extends AppCompatActivity {
         }
     }
 
+    //static class GalProcImgAsync extends AsyncTask
 
 }

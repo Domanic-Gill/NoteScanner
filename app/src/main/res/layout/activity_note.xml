@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/colorBackgroundGrey"
+    android:background="@color/colorBackground"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     tools:context=".NoteActivity">
 
@@ -30,7 +30,7 @@
             android:layout_height="30dp"
             android:id="@+id/note_title"
             android:layout_marginBottom="10dp"
-            android:background="@color/colorBackground"
+            android:background="@color/colorBackgroundGreyLight"
             android:hint="Title"
             android:textStyle="bold"
             android:inputType="textAutoComplete"/>
@@ -39,7 +39,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:id="@+id/note_body"
-            android:background="@color/colorBackground"
+            android:background="@color/colorBackgroundGreyLight"
             android:hint="Note body"
             android:inputType="textMultiLine"
             android:gravity="start" />
