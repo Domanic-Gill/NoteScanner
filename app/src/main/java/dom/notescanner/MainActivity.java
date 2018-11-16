@@ -1,5 +1,6 @@
 package dom.notescanner;
 
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Rect;
@@ -23,18 +24,51 @@ import com.github.clans.fab.FloatingActionMenu;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.ml.CvSVM;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 
 //TODO - implement list view properly
 public class MainActivity extends AppCompatActivity {
     boolean openCVLoaded;
     private static final String TAG = "MainActivity";
+    private File msvmModel;
+    private CvSVM mSvm;
+
     BaseLoaderCallback mCallBack = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
             switch (status) {
                 case BaseLoaderCallback.SUCCESS: {
                     Log.i(TAG, "OpenCV loaded successfully");
+
+                    try {
+                        InputStream is = getResources().openRawResource(R.raw.eclipse);
+                        File svmModelDir = getDir("svmModelDir", Context.MODE_PRIVATE);
+
+                        msvmModel = new File(svmModelDir, "svmModel.yaml");
+                        FileOutputStream os = new FileOutputStream(msvmModel);
+
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                        is.close();
+                        os.close();
+                        mSvm = new CvSVM();
+                        mSvm.load(msvmModel.getAbsolutePath());
+                        Log.d(TAG, "SVM COUNT = " + mSvm.get_support_vector_count());
+                        svmModelDir.delete();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Log.e(TAG, "Failed to load SVM, exception thrown: " + e);
+                    }
                     openCVLoaded =  true;
                     break;
                 }

@@ -11,11 +11,16 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.ImageView;
 import android.widget.Toast;
+
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
+
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GalleryActivity extends AppCompatActivity {
 
@@ -34,7 +39,7 @@ public class GalleryActivity extends AppCompatActivity {
             Uri uri = Uri.parse(bundle.getString("uri"));
             new PreProcImgAsync(uri, getApplicationContext(), this).execute();
         } else {
-            Toast.makeText(GalleryActivity.this,"Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(GalleryActivity.this, "Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -61,7 +66,7 @@ public class GalleryActivity extends AppCompatActivity {
         private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without activity
         private Uri mUri;   //URI of  the image
         Bitmap inputBitmap; //Bitmap of the Image
-        Mat finalMat;   //final Matrix to display to view back in Gallery
+        Mat displayMat;   //final Matrix to display to view back in Gallery
 
         PreProcImgAsync(Uri uri, final Context appContext, GalleryActivity myActivity) {
             mUri = uri;
@@ -85,7 +90,7 @@ public class GalleryActivity extends AppCompatActivity {
 
             //get the bitmap from URI using app context
             appCon = mAppContext.get();
-            if(appCon != null) {
+            if (appCon != null) {
                 try {
                     inputBitmap = MediaStore.Images.Media.getBitmap(appCon.getContentResolver(), mUri);
                 } catch (IOException e) {
@@ -98,11 +103,18 @@ public class GalleryActivity extends AppCompatActivity {
             Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
 
             ocrProc = new OcrProcessor(inMat);
-            inMat = ocrProc.scaleMat(inMat);    //downscale any high resolution images
+            ocrProc.scaleMat(inMat);    //downscale any high resolution images
             publishProgress(inMat);             //show downscaled image to ImageView
-            Mat noiseMat = ocrProc.removeNoise(inMat,true); //remove noise from Image
-            finalMat = ocrProc.getTextRegions(noiseMat);
 
+            Mat noiseMat = inMat.clone();
+            ocrProc.removeNoise(noiseMat, true); //remove noise from Image
+
+            Mat textRegionMat = noiseMat.clone();
+            List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);
+            System.out.println("TEXT REGION SIZE " + textRegions.size());
+            displayMat = new Mat();
+            displayMat = ocrProc.displayTextRegions(noiseMat, textRegions);
+            //displayMat = ocrProc.getTextRegions(textRegionMat);
             return null;
         }
 
@@ -114,7 +126,7 @@ public class GalleryActivity extends AppCompatActivity {
             if (activity == null || activity.isFinishing() || activity.isDestroyed())
                 return;
 
-            ((GalleryActivity) activity).displayMat(finalMat, true);
+            ((GalleryActivity) activity).displayMat(displayMat, true);
         }
 
         @Override

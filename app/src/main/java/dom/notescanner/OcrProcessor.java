@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.opencv.core.Core.FILLED;
+import static org.opencv.core.Core.bitwise_not;
 import static org.opencv.core.Core.countNonZero;
 import static org.opencv.core.Core.line;
 
@@ -66,14 +67,12 @@ class OcrProcessor {
 
     /*Use thresholding to convert noisy image to clean binary image */
     Mat removeNoise(Mat m, boolean removeLines) {
+
         //threshold image to remove noise and invert image for line removal
         Imgproc.cvtColor(m, m, Imgproc.COLOR_BGR2GRAY); //change to greyscale
         Imgproc.adaptiveThreshold(m, m, 255,
                 Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
                 Imgproc.THRESH_BINARY, 15, 5); //originally blocksize = 11, c = 2
-        // Imgproc.erode(inputMatrix, inputMatrix, Mat.ones(new Size(2,2), 0));
-        //Imgproc.erode(inputMatrix, inputMatrix, Mat.ones(new Size(3,3), 0));
-        // Imgproc.dilate(inputMatrix, inputMatrix, Mat.ones(new Size(3,3), 0));
 
         //LINE REMOVAL
         if (removeLines) {
@@ -97,11 +96,14 @@ class OcrProcessor {
 
             Core.bitwise_not(m, m); //return image back to white background and black text
         }
-
         return m;
     }
 
-    Mat getTextRegions(Mat m) {
+    /*find all the text regions in the input matrix using morphology and contouring*/
+    List<Rect> getTextRegionsRects(Mat m) {
+
+        List<Rect> textRegions = new ArrayList<>();
+
         Mat colourMat = new Mat();
         Imgproc.cvtColor(m, colourMat, Imgproc.COLOR_GRAY2BGR);
 
@@ -114,37 +116,45 @@ class OcrProcessor {
         List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchy = new Mat();
 
-        Imgproc.dilate(m, m, Mat.ones(new Size(2,2), 0));
+        Imgproc.dilate(m, m, Mat.ones(new Size(2, 2), 0));
         Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
-        Imgproc.erode(m, m, Mat.ones(new Size(2,2), 0));
-
+        Imgproc.erode(m, m, Mat.ones(new Size(2, 2), 0));
         for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {
-            Log.d(TAG, "entering with i = " + i);
+            Log.d(TAG, "Processing rect  = " + i);
             Rect rect = Imgproc.boundingRect(contours.get(i));
             Mat maskRegion = new Mat(mask, rect);
             maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
             Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), FILLED);
-            double r = (double) countNonZero(maskRegion) / (rect.width * rect.height);
 
+            if (rect.height > 16 && rect.width > 12)   //Region is at least 16x12
+                textRegions.add(rect);
+        }
+        return textRegions;
+    }
+
+    /*Iterates through all text boundaries and conditionally insert the coloured boundary to the input matrix */
+    Mat displayTextRegions(Mat dst, List<Rect> textRegions) {
+        Mat colMat = dst.clone();   //colour version of input matrix
+        Imgproc.cvtColor(dst, colMat, Imgproc.COLOR_GRAY2BGR);
+
+        for (int i = 0; i < textRegions.size(); i++) {
+            Rect region = textRegions.get(i);
+            Mat roi = dst.submat(region);
+            bitwise_not(roi, roi);
+            double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
             Scalar colour;   //colour of rectangle
             int thickness = 2;   //thickness of rectangle lines
 
-            if (r > 0.15 && rect.height > 8 && rect.width > 8) {   //15% black and at least 8x8
-                colour = new Scalar(0, 255, 0);
+            if (blackPercent > 0.06) {   //Region must be at least 6% black
+                colour = new Scalar(0, 255, 0);         //Make green
             } else {
-                colour = new Scalar(255, 0, 0);
+                colour = new Scalar(255, 0, 0);         //Make red
             }
-
-            Point tl = rect.tl();
-            Point br = rect.br();
-
-            if (rect.height > 16 && rect.width > 8)
-                Core.rectangle(colourMat, tl, br, colour, thickness);
-
+            Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
         }
-
-        return colourMat;
+        return colMat;
     }
+
 
     void loadSVM() {
 
