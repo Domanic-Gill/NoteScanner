@@ -1,37 +1,24 @@
 package dom.notescanner;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ImageView;
 import android.widget.Toast;
-
-import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.Utils;
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.android.OpenCVLoader;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.Point;
-import org.opencv.core.Scalar;
-import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.ml.CvSVM;
-
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.List;
-
-import static java.security.AccessController.getContext;
 
 public class GalleryActivity extends AppCompatActivity {
+
     private static final String TAG = "GalleryActivity";
     ImageView imgPrevView;
 
@@ -45,14 +32,13 @@ public class GalleryActivity extends AppCompatActivity {
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
             Uri uri = Uri.parse(bundle.getString("uri"));
-            new PreProcImgAsync(this, uri).execute();
+            new PreProcImgAsync(uri, getApplicationContext(), this).execute();
         } else {
             Toast.makeText(GalleryActivity.this,"Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
         }
-
     }
 
-    //takes matrix and outputs it to view
+    //takes matrix and outputs it to ImageView
     public void displayMat(Mat m, boolean isRGB) {
         if (isRGB) {
             final Bitmap bmpRGB = Bitmap.createBitmap(m.cols(), m.rows(), Bitmap.Config.RGB_565);
@@ -68,17 +54,22 @@ public class GalleryActivity extends AppCompatActivity {
         }
     }
 
-    private class PreProcImgAsync extends AsyncTask<String, Mat, Void>
+    static class PreProcImgAsync extends AsyncTask<String, Mat, Void>  //weak reference and strong app context needs to be passed
     {
+        private static final String TAG = "GALACTIVITY-ASYNCTASK";      //galactic activity :^)
+        private final WeakReference<GalleryActivity> weakActivity;  //weak reference to activity
+        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without activity
         private Uri mUri;   //URI of  the image
-        private final Context mContext;
         Bitmap inputBitmap; //Bitmap of the Image
         Mat finalMat;   //final Matrix to display to view back in Gallery
 
-        PreProcImgAsync(Context c, Uri uri) {
-            mContext = c;
+        PreProcImgAsync(Uri uri, final Context appContext, GalleryActivity myActivity) {
             mUri = uri;
+
+            weakActivity = new WeakReference<>(myActivity);
+            mAppContext = new WeakReference<>(appContext);
         }
+
 
         @Override
         protected void onPreExecute() {
@@ -89,33 +80,53 @@ public class GalleryActivity extends AppCompatActivity {
         protected Void doInBackground(String... params) {
 
             Mat inMat = new Mat();  //Image matrix
+            Context appCon;         //Strong reference to application context;
+            OcrProcessor ocrProc;   //Object containing OCR functions
 
-            try {   //get the bitmap from URI
-                inputBitmap = MediaStore.Images.Media.getBitmap(mContext.getContentResolver(), mUri);    //do with strong private reference to application context
-            } catch (IOException e) {
-                e.printStackTrace();
+            //get the bitmap from URI using app context
+            appCon = mAppContext.get();
+            if(appCon != null) {
+                try {
+                    inputBitmap = MediaStore.Images.Media.getBitmap(appCon.getContentResolver(), mUri);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.e(TAG, "APP CONTEXT IS NULL");
             }
 
-            //change image to OpenCV matrix
-            Utils.bitmapToMat(inputBitmap, inMat);
+            Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
 
-            OcrProcessor ocrProc = new OcrProcessor(inMat);
+            ocrProc = new OcrProcessor(inMat);
             inMat = ocrProc.scaleMat(inMat);    //downscale any high resolution images
             publishProgress(inMat);             //show downscaled image to ImageView
-
-            finalMat = ocrProc.removeNoise(inMat,true); //remove noise from Image
+            Mat noiseMat = ocrProc.removeNoise(inMat,true); //remove noise from Image
+            finalMat = ocrProc.getTextRegions(noiseMat);
 
             return null;
         }
+
         @Override
         protected void onPostExecute(Void result) {
-            displayMat(finalMat, false);
+            Activity activity = weakActivity.get(); //get strong reference to Gallery activity
+
+            //Don't update if activity not found;
+            if (activity == null || activity.isFinishing() || activity.isDestroyed())
+                return;
+
+            ((GalleryActivity) activity).displayMat(finalMat, true);
         }
 
         @Override
         protected void onProgressUpdate(Mat... values) {
             super.onProgressUpdate(values);
-            displayMat(values[0], true);
+            Activity activity = weakActivity.get(); //get strong reference to Gallery activity
+
+            // Don't update if activity not found
+            if (activity == null || activity.isFinishing() || activity.isDestroyed())
+                return;
+
+            ((GalleryActivity) activity).displayMat(values[0], true);
         }
 
         @Override
@@ -123,7 +134,4 @@ public class GalleryActivity extends AppCompatActivity {
             super.onCancelled();
         }
     }
-
-    //static class GalProcImgAsync extends AsyncTask
-
 }

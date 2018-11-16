@@ -1,18 +1,33 @@
 package dom.notescanner;
 
-import org.opencv.android.Utils;
+import android.util.Log;
+
 import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
-public class OcrProcessor {
-    private float aspectRatio = 0;  //Aspect Ratio of image
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.opencv.core.Core.FILLED;
+import static org.opencv.core.Core.countNonZero;
+import static org.opencv.core.Core.line;
+
+class OcrProcessor {
+    private static final String TAG = "OCRPROC";
+    private float aspectRatio;  //Aspect Ratio of image
     private static final float AR_1610 = (float) 1.6;        //aspect ratio 16:10
     private static final float AR_43 = (float) 1.33;          //aspect ratio 4:3
 
-    public OcrProcessor(Mat m) {
+    OcrProcessor(Mat m) {
         aspectRatio = (float) m.rows() / (float) m.cols();
         if (aspectRatio < 1) {
             aspectRatio = (float) m.cols() / (float) m.rows();
@@ -86,7 +101,52 @@ public class OcrProcessor {
         return m;
     }
 
-    public void getTextRegions() {
+    Mat getTextRegions(Mat m) {
+        Mat colourMat = new Mat();
+        Imgproc.cvtColor(m, colourMat, Imgproc.COLOR_GRAY2BGR);
+
+        Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
+        Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1)); //used to be morph rect
+        Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
+
+        Mat mask = Mat.zeros(m.size(), CvType.CV_8UC1);
+        List<MatOfPoint> contours = new ArrayList<>();
+        Mat hierarchy = new Mat();
+
+        Imgproc.dilate(m, m, Mat.ones(new Size(2,2), 0));
+        Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
+        Imgproc.erode(m, m, Mat.ones(new Size(2,2), 0));
+
+        for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {
+            Log.d(TAG, "entering with i = " + i);
+            Rect rect = Imgproc.boundingRect(contours.get(i));
+            Mat maskRegion = new Mat(mask, rect);
+            maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
+            Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), FILLED);
+            double r = (double) countNonZero(maskRegion) / (rect.width * rect.height);
+
+            Scalar colour;   //colour of rectangle
+            int thickness = 2;   //thickness of rectangle lines
+
+            if (r > 0.15 && rect.height > 8 && rect.width > 8) {   //15% black and at least 8x8
+                colour = new Scalar(0, 255, 0);
+            } else {
+                colour = new Scalar(255, 0, 0);
+            }
+
+            Point tl = rect.tl();
+            Point br = rect.br();
+
+            if (rect.height > 16 && rect.width > 8)
+                Core.rectangle(colourMat, tl, br, colour, thickness);
+
+        }
+
+        return colourMat;
+    }
+
+    void loadSVM() {
 
     }
 }

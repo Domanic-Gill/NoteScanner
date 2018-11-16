@@ -195,6 +195,13 @@ public class MainActivity extends AppCompatActivity {
         } else {
             super.onBackPressed();
         }
+
+    }
+    @Override
+    public void onResume(){
+        super.onResume();
+        floatingActionMenu.close(false);
     }
 }
+
 
