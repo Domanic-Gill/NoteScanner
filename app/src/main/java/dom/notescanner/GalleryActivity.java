@@ -1,5 +1,4 @@
 package dom.notescanner;
-
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -13,9 +12,13 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.ml.CvSVM;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -63,14 +66,14 @@ public class GalleryActivity extends AppCompatActivity {
     {
         private static final String TAG = "GALACTIVITY-ASYNCTASK";      //galactic activity :^)
         private final WeakReference<GalleryActivity> weakActivity;  //weak reference to activity
-        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without activity
+        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without ab activity
         private Uri mUri;   //URI of  the image
         Bitmap inputBitmap; //Bitmap of the Image
         Mat displayMat;   //final Matrix to display to view back in Gallery
 
+
         PreProcImgAsync(Uri uri, final Context appContext, GalleryActivity myActivity) {
             mUri = uri;
-
             weakActivity = new WeakReference<>(myActivity);
             mAppContext = new WeakReference<>(appContext);
         }
@@ -86,7 +89,6 @@ public class GalleryActivity extends AppCompatActivity {
 
             Mat inMat = new Mat();  //Image matrix
             Context appCon;         //Strong reference to application context;
-            OcrProcessor ocrProc;   //Object containing OCR functions
 
             //get the bitmap from URI using app context
             appCon = mAppContext.get();
@@ -101,8 +103,16 @@ public class GalleryActivity extends AppCompatActivity {
             }
 
             Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
+            OcrProcessor ocrProc = new OcrProcessor(inMat);
 
-            ocrProc = new OcrProcessor(inMat);
+            Thread z = null;
+            Runnable r = null;
+            appCon = mAppContext.get();
+            if (appCon != null) {
+                r = new SvmLoader(ocrProc, appCon);
+                z = new Thread(r);
+                z.start();
+            }
             ocrProc.scaleMat(inMat);    //downscale any high resolution images
             publishProgress(inMat);             //show downscaled image to ImageView
 
@@ -110,11 +120,37 @@ public class GalleryActivity extends AppCompatActivity {
             ocrProc.removeNoise(noiseMat, true); //remove noise from Image
 
             Mat textRegionMat = noiseMat.clone();
-            List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);
-            System.out.println("TEXT REGION SIZE " + textRegions.size());
+            List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);    //retrieve regions of text
+            Log.d(TAG,textRegions.size() + "TEXT REGIONS DETECTED");
             displayMat = new Mat();
-            displayMat = ocrProc.displayTextRegions(noiseMat, textRegions);
-            //displayMat = ocrProc.getTextRegions(textRegionMat);
+            displayMat = ocrProc.displayTextRegions(noiseMat, textRegions);         //display regions to matrix
+
+            Rect rio = textRegions.get(55);
+            Mat cropped = new Mat(noiseMat, rio);
+            Mat sneak = new Mat();
+            cropped.copyTo(sneak);
+            Imgproc.resize(sneak, sneak, new Size(28,28));
+            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY);
+            Imgproc.dilate(sneak, sneak, Mat.ones(new Size(2, 2), 0));
+            sneak.convertTo(sneak, CvType.CV_32FC1);
+            Mat fin = sneak.reshape(1,1);
+
+            long time = System.currentTimeMillis();
+            try {
+                z.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            Log.d(TAG,"ASYNC WAITING TIME =  " + (float)((System.currentTimeMillis() - time) / 1000));
+            CvSVM svm = ((SvmLoader) r).getSvm();
+
+
+            Log.d(TAG, "ASYNC SVM = " + svm.get_support_vector_count());
+            double f = svm.predict(fin);
+
+            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + f);
+            System.out.println(sneak.dump());
+
             return null;
         }
 
@@ -145,5 +181,26 @@ public class GalleryActivity extends AppCompatActivity {
         protected void onCancelled() {
             super.onCancelled();
         }
+
+        class SvmLoader implements Runnable{
+            private OcrProcessor ocrProcessor;
+            private Context appContext;
+            CvSVM tsvm;
+
+            public SvmLoader(OcrProcessor o, Context c){
+                ocrProcessor = o;
+                appContext = c;
+            }
+
+            public void run(){
+                tsvm = ocrProcessor.loadSVM(appContext);
+            }
+
+            public CvSVM getSvm() {
+                return tsvm;
+            }
+
+        }
     }
+
 }

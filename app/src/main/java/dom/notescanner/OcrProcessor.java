@@ -1,5 +1,6 @@
 package dom.notescanner;
 
+import android.content.Context;
 import android.util.Log;
 
 import org.opencv.core.Core;
@@ -13,7 +14,12 @@ import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.ml.CvSVM;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -155,8 +161,51 @@ class OcrProcessor {
         return colMat;
     }
 
+    /**
+     * Returns an OpenCV SVM which is loaded from raw resources and
+     * stored in a temporary file which is deleted after loading.
+     * <p></p>
+     * Alternatively if the temp file has not been deleted we use
+     * it instead of rewriting a new temp file
+     * @param   appContext  application context to load file
+     * @return              Loaded CvSVM
+     */
+    CvSVM loadSVM(Context appContext) {
+        if(appContext != null) {
+            try {
+                File svmModelDir = appContext.getDir("svmModelDir", Context.MODE_PRIVATE);
+                File mSvmModel = new File(svmModelDir, "svmModel.yaml");
+                if (!mSvmModel.exists()) {
+                    InputStream is = appContext.getResources().openRawResource(R.raw.eclipse);
+                    FileOutputStream os = new FileOutputStream(mSvmModel);
 
-    void loadSVM() {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = is.read(buffer)) != -1) {
+                        os.write(buffer, 0, bytesRead);
+                    }
+                    is.close();
+                    os.close();
+                } else {
+                    Log.d(TAG, "FILE ALREADY EXISTS. SKIPPING UNPACKING");
+                }
+                CvSVM mSvm = new CvSVM();
+                 long time = System.currentTimeMillis();
+                mSvm.load(mSvmModel.getAbsolutePath());
+                Log.d(TAG,"LOADING TIME =  " + (float)((System.currentTimeMillis() - time) / 1000));
+                Log.d(TAG, "SVM COUNT = " + mSvm.get_support_vector_count());
+                //svmModelDir.delete();
 
+                return mSvm;
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.e(TAG, "Failed to load SVM, exception thrown: " + e);
+            }
+        } else {
+            Log.e(TAG, "Failed to load SVM, appContext is null");
+        }
+        return null;
     }
+
 }

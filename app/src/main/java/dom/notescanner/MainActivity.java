@@ -45,30 +45,6 @@ public class MainActivity extends AppCompatActivity {
             switch (status) {
                 case BaseLoaderCallback.SUCCESS: {
                     Log.i(TAG, "OpenCV loaded successfully");
-
-                    try {
-                        InputStream is = getResources().openRawResource(R.raw.eclipse);
-                        File svmModelDir = getDir("svmModelDir", Context.MODE_PRIVATE);
-
-                        msvmModel = new File(svmModelDir, "svmModel.yaml");
-                        FileOutputStream os = new FileOutputStream(msvmModel);
-
-                        byte[] buffer = new byte[4096];
-                        int bytesRead;
-                        while ((bytesRead = is.read(buffer)) != -1) {
-                            os.write(buffer, 0, bytesRead);
-                        }
-                        is.close();
-                        os.close();
-                        mSvm = new CvSVM();
-                        mSvm.load(msvmModel.getAbsolutePath());
-                        Log.d(TAG, "SVM COUNT = " + mSvm.get_support_vector_count());
-                        svmModelDir.delete();
-
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        Log.e(TAG, "Failed to load SVM, exception thrown: " + e);
-                    }
                     openCVLoaded =  true;
                     break;
                 }
