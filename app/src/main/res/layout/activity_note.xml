@@ -32,7 +32,8 @@
             android:layout_marginBottom="10dp"
             android:background="@color/colorBackgroundGreyLight"
             android:hint="Title"
-            android:textStyle="bold"
+            android:textColor="@color/colorText"
+            android:fontFamily="sans-serif"
             android:inputType="textAutoComplete"/>
 
         <EditText
@@ -41,6 +42,9 @@
             android:id="@+id/note_body"
             android:background="@color/colorBackgroundGreyLight"
             android:hint="Note body"
+            android:textColor="@color/colorTextGrey"
+            android:fontFamily="sans-serif"
+            android:textSize="14dp"
             android:inputType="textMultiLine"
             android:gravity="start" />
 

@@ -21,6 +21,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.opencv.core.Core.FILLED;
@@ -135,6 +137,7 @@ class OcrProcessor {
             if (rect.height > 16 && rect.width > 12)   //Region is at least 16x12
                 textRegions.add(rect);
         }
+        Collections.sort(textRegions, new SortRectbyPos()); //sort regions top to bottom, left to right
         return textRegions;
     }
 
@@ -142,9 +145,13 @@ class OcrProcessor {
     Mat displayTextRegions(Mat dst, List<Rect> textRegions) {
         Mat colMat = dst.clone();   //colour version of input matrix
         Imgproc.cvtColor(dst, colMat, Imgproc.COLOR_GRAY2BGR);
+        double minRectY = textRegions.get(0).tl().y;
+        double maxRectY = textRegions.get(textRegions.size()-1).br().y;
 
         for (int i = 0; i < textRegions.size(); i++) {
             Rect region = textRegions.get(i);
+            if(region.tl().y < minRectY) minRectY = region.tl().y;
+            if(region.br().y > maxRectY) maxRectY = region.br().y;
             Mat roi = dst.submat(region);
             bitwise_not(roi, roi);
             double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
@@ -158,7 +165,20 @@ class OcrProcessor {
             }
             Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
         }
-        return colMat;
+
+        //Create cropped image of Region of Interest if there is space
+        Point minRectPoint;
+        Point maxRectPoint;
+        if (maxRectY < colMat.height() - 10 && minRectY > 10) {
+            minRectPoint = new Point(0,minRectY - 10);
+            maxRectPoint = new Point((double)colMat.width(),maxRectY+10);
+        } else {
+            minRectPoint = new Point(0, minRectY);
+            maxRectPoint = new Point((double)colMat.width(), maxRectY);
+        }
+        Rect r = new Rect(minRectPoint, maxRectPoint);
+
+        return new Mat(colMat, r);
     }
 
     /**
@@ -207,5 +227,31 @@ class OcrProcessor {
         }
         return null;
     }
+
+    /**
+     * Takes an  {@link ArrayList<Rect>} which are text regions but
+     * are out of order and sorts them. If they are on the same line
+     * then the Rect with the lowest y (closest to the left) gets priority.
+     * <p></p>
+     * If they are not on the same line it defaults to the Rect with
+     * the lowest y (closest to the top)
+     * <p></p>
+     * This results in the List being sorted from top to bottom, left to
+     * right
+     */
+    class SortRectbyPos implements Comparator<Rect> {
+        @Override
+        public int compare(Rect a, Rect b) {
+            if ((a.tl().y <= b.tl().y && a.tl().y + a.height >= b.tl().y) ||
+                    (b.tl().y <= a.tl().y && b.tl().y + b.height >= a.tl().y)) {
+                return (a.tl().x < b.tl().x) ? -1 : 1;
+
+            } else  {
+                return (a.tl().y < b.tl().y) ? -1 : 1;
+            }
+        }
+
+    }
+
 
 }

@@ -125,7 +125,7 @@ public class GalleryActivity extends AppCompatActivity {
             displayMat = new Mat();
             displayMat = ocrProc.displayTextRegions(noiseMat, textRegions);         //display regions to matrix
 
-            Rect rio = textRegions.get(55);
+            /*Rect rio = textRegions.get(55);
             Mat cropped = new Mat(noiseMat, rio);
             Mat sneak = new Mat();
             cropped.copyTo(sneak);
@@ -149,7 +149,7 @@ public class GalleryActivity extends AppCompatActivity {
             double f = svm.predict(fin);
 
             Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + f);
-            System.out.println(sneak.dump());
+            System.out.println(sneak.dump());*/
 
             return null;
         }
