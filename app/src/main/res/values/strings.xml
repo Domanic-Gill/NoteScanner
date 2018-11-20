@@ -2,4 +2,6 @@
     <string name="app_name">Note Scanner</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="text_processing">Processing Image…</string>
+    <string name="text_processed">Image Processed!</string>
 </resources>

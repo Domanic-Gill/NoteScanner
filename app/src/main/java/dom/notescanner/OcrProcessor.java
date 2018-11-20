@@ -35,6 +35,7 @@ class OcrProcessor {
     private float aspectRatio;  //Aspect Ratio of image
     private static final float AR_1610 = (float) 1.6;        //aspect ratio 16:10
     private static final float AR_43 = (float) 1.33;          //aspect ratio 4:3
+    private boolean isDownscaled = false;
 
     OcrProcessor(Mat m) {
         aspectRatio = (float) m.rows() / (float) m.cols();
@@ -48,6 +49,7 @@ class OcrProcessor {
         int scaleRows, scaleCols;
 
         if (m.rows() > m.cols() && m.rows() > 1920) {   //if image portrait
+            isDownscaled = true;
             if (aspectRatio > 1.7) {                //if image 16:9
                 scaleRows = m.rows() - 1920;
                 scaleCols = m.cols() - 1080;
@@ -59,6 +61,7 @@ class OcrProcessor {
                     m.rows() - scaleRows);
             Imgproc.resize(m, m, size);
         } else if (m.rows() < m.cols() && m.cols() > 1920) {    //if image landscape
+            isDownscaled = true;
             if (aspectRatio > 1.7) {                //if image 16:9
                 scaleRows = m.rows() - 1080;
                 scaleCols = m.cols() - 1920;
@@ -89,14 +92,14 @@ class OcrProcessor {
             Mat ver = m.clone();
 
             //30 sharper on 16:9, 30 on 4:3 is too low so we double it
-            int hs = (aspectRatio >= AR_1610) ? hor.cols() / 30 : hor.cols() / 60;
+            int hs = (isDownscaled) ? hor.cols() / 60 : hor.cols() / 30;
             Mat horStruct = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(hs, 1));
             Imgproc.erode(hor, hor, horStruct, new Point(-1, -1), 1);
             Imgproc.dilate(hor, hor, horStruct, new Point(-1, -1), 1);
             Core.subtract(m, hor, m);   //subtract mask of horizontal lines from original mat
 
             //now remove vertical lines (column bar, etc)
-            int vs = (aspectRatio >= AR_1610) ? hor.rows() / 30 : hor.rows() / 60;
+            int vs = (isDownscaled) ? hor.rows() / 30 : hor.rows() / 15;
             Mat verStruct = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(1, vs));
             Imgproc.erode(ver, ver, verStruct, new Point(-1, -1), 1);
             Imgproc.dilate(ver, ver, verStruct, new Point(-1, -1), 1);
