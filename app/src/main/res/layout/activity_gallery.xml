@@ -34,6 +34,8 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:onClick="onClick"
+            android:id="@+id/cancelButton"
             android:paddingHorizontal="50dp"
             android:fadingEdge="vertical"
             android:text="Cancel" />
@@ -41,7 +43,9 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:onClick="onClick"
             android:text="Accept"
+            android:id="@+id/acceptButton"
             android:paddingHorizontal="50dp"/>
 
 

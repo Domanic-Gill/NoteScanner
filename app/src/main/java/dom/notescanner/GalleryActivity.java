@@ -1,6 +1,7 @@
 package dom.notescanner;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -8,6 +9,8 @@ import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -29,6 +32,7 @@ public class GalleryActivity extends AppCompatActivity {
 
     private static final String TAG = "GalleryActivity";
     ImageView imgPrevView;
+    Button cancelButton, acceptButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +40,8 @@ public class GalleryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gallery);
         imgPrevView = findViewById(R.id.image_view);
+        cancelButton = findViewById(R.id.cancelButton);
+        acceptButton = findViewById(R.id.acceptButton);
 
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
@@ -43,6 +49,16 @@ public class GalleryActivity extends AppCompatActivity {
             new PreProcImgAsync(uri, getApplicationContext(), this).execute();
         } else {
             Toast.makeText(GalleryActivity.this, "Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.acceptButton:
+                break;
+
+            case R.id.cancelButton:
+                finish();
         }
     }
 
@@ -124,6 +140,12 @@ public class GalleryActivity extends AppCompatActivity {
             Log.d(TAG,textRegions.size() + "TEXT REGIONS DETECTED");
             displayMat = new Mat();
             displayMat = ocrProc.displayTextRegions(noiseMat, textRegions);         //display regions to matrix
+
+            ocrProc.checkWord2(textRegions, noiseMat);
+
+           // ocrProc.checkWord(textRegions, noiseMat);
+
+
 
             /*Rect rio = textRegions.get(55);
             Mat cropped = new Mat(noiseMat, rio);

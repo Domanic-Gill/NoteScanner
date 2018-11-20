@@ -7,10 +7,8 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
-import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
-import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
@@ -24,11 +22,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.ListIterator;
 
 import static org.opencv.core.Core.FILLED;
 import static org.opencv.core.Core.bitwise_not;
 import static org.opencv.core.Core.countNonZero;
 import static org.opencv.core.Core.line;
+import static org.opencv.core.Core.log;
 
 class OcrProcessor {
     private static final String TAG = "OCRPROC";
@@ -146,12 +146,12 @@ class OcrProcessor {
         Mat colMat = dst.clone();   //colour version of input matrix
         Imgproc.cvtColor(dst, colMat, Imgproc.COLOR_GRAY2BGR);
         double minRectY = textRegions.get(0).tl().y;
-        double maxRectY = textRegions.get(textRegions.size()-1).br().y;
+        double maxRectY = textRegions.get(textRegions.size() - 1).br().y;
 
         for (int i = 0; i < textRegions.size(); i++) {
             Rect region = textRegions.get(i);
-            if(region.tl().y < minRectY) minRectY = region.tl().y;
-            if(region.br().y > maxRectY) maxRectY = region.br().y;
+            if (region.tl().y < minRectY) minRectY = region.tl().y;
+            if (region.br().y > maxRectY) maxRectY = region.br().y;
             Mat roi = dst.submat(region);
             bitwise_not(roi, roi);
             double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
@@ -163,6 +163,7 @@ class OcrProcessor {
             } else {
                 colour = new Scalar(255, 0, 0);         //Make red
             }
+
             Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
         }
 
@@ -170,15 +171,41 @@ class OcrProcessor {
         Point minRectPoint;
         Point maxRectPoint;
         if (maxRectY < colMat.height() - 10 && minRectY > 10) {
-            minRectPoint = new Point(0,minRectY - 10);
-            maxRectPoint = new Point((double)colMat.width(),maxRectY+10);
+            minRectPoint = new Point(0, minRectY - 10);
+            maxRectPoint = new Point((double) colMat.width(), maxRectY + 10);
         } else {
             minRectPoint = new Point(0, minRectY);
-            maxRectPoint = new Point((double)colMat.width(), maxRectY);
+            maxRectPoint = new Point((double) colMat.width(), maxRectY);
         }
         Rect r = new Rect(minRectPoint, maxRectPoint);
 
         return new Mat(colMat, r);
+    }
+
+    public void checkWord2(List<Rect> r, Mat src) {
+        double imgWidth = src.width();
+        ArrayList<WordObject> wordList = new ArrayList<>();
+        ListIterator<Rect> ri = r.listIterator();
+        Rect prevRect = ri.next();
+        Mat prevMat = src.submat(prevRect);
+        wordList.add(new WordObject(prevMat));
+
+        while (ri.hasNext()) {
+            Rect curRect = ri.next();
+            Mat curMat = src.submat(curRect);
+            double prevRectBuffer = (prevRect.br().x+15 > imgWidth) ?  imgWidth-1 : prevRect.br().x+15;         //need to change this to subtracted difference of two rects
+            if (curRect.tl().y > prevRect.br().y) {                 //if it is a wordMat on the next line
+                wordList.get(wordList.size()-1).setLineBreak();
+                wordList.add(new WordObject(curMat));
+            } else if(curRect.tl().x <= prevRectBuffer) {           //if region is close to previous, merge the two
+                wordList.get(wordList.size()-1).mergeText(curMat);
+            } else {
+                wordList.add(new WordObject(curMat));               //if region is far from previous, create separate word
+            }
+            prevRect = curRect.clone();
+        }
+
+        for (WordObject aWordList : wordList) Log.d(TAG, " " + aWordList.getLetters().size() + "| " + aWordList.getLineBreak());
     }
 
     /**
@@ -187,11 +214,12 @@ class OcrProcessor {
      * <p></p>
      * Alternatively if the temp file has not been deleted we use
      * it instead of rewriting a new temp file
-     * @param   appContext  application context to load file
-     * @return              Loaded CvSVM
+     *
+     * @param appContext application context to load file
+     * @return Loaded CvSVM
      */
     CvSVM loadSVM(Context appContext) {
-        if(appContext != null) {
+        if (appContext != null) {
             try {
                 File svmModelDir = appContext.getDir("svmModelDir", Context.MODE_PRIVATE);
                 File mSvmModel = new File(svmModelDir, "svmModel.yaml");
@@ -210,9 +238,9 @@ class OcrProcessor {
                     Log.d(TAG, "FILE ALREADY EXISTS. SKIPPING UNPACKING");
                 }
                 CvSVM mSvm = new CvSVM();
-                 long time = System.currentTimeMillis();
+                long time = System.currentTimeMillis();
                 mSvm.load(mSvmModel.getAbsolutePath());
-                Log.d(TAG,"LOADING TIME =  " + (float)((System.currentTimeMillis() - time) / 1000));
+                Log.d(TAG, "LOADING TIME =  " + (float) ((System.currentTimeMillis() - time) / 1000));
                 Log.d(TAG, "SVM COUNT = " + mSvm.get_support_vector_count());
                 //svmModelDir.delete();
 
@@ -239,14 +267,14 @@ class OcrProcessor {
      * This results in the List being sorted from top to bottom, left to
      * right
      */
-    class SortRectbyPos implements Comparator<Rect> {
+    static class SortRectbyPos implements Comparator<Rect> {
         @Override
         public int compare(Rect a, Rect b) {
             if ((a.tl().y <= b.tl().y && a.tl().y + a.height >= b.tl().y) ||
                     (b.tl().y <= a.tl().y && b.tl().y + b.height >= a.tl().y)) {
                 return (a.tl().x < b.tl().x) ? -1 : 1;
 
-            } else  {
+            } else {
                 return (a.tl().y < b.tl().y) ? -1 : 1;
             }
         }
