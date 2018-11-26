@@ -43,17 +43,16 @@ import java.util.Date;
  * ALWAYS PASS REFERENCE AND USE IF IT ISN'T NULL, ELSE LOAD AND RETURN
  * DOESN'T SOLVE ONCREATE,*/
 public class MainActivity extends AppCompatActivity {
-    boolean openCVLoaded;
+
     private static final String TAG = "MainActivity";
-    private String mCurrentPhotoPath;
+    public static final int GAL_IMAGE=42, CAM_IMAGE=43, CAM_REQUEST=44, GAL_ACT=45; //Request codes
+    private int lastNoteID = 0;                     //id of the final note of the ListView
+    private String mCurrentPhotoPath;               //file path of new temporary file
+    boolean openCVLoaded;
 
-    private DrawerLayout drawer;    //navigation drawer
-    private int lastNoteID = 0;     //id of the final note of the ListView
-    public static final int GALLERY_IMAGE = 42, CAMERA_IMAGE = 43, CAMERA_REQUEST = 44;
-
-    //fab menu and respective buttons below
-    private FloatingActionMenu floatingActionMenu;
-    SimpleCursorAdapter simpleCursorAdapter;
+    private FloatingActionMenu floatingActionMenu;  //bottom right fab menu
+    private DrawerLayout drawer;                    //navigation drawer
+    SimpleCursorAdapter simpleCursorAdapter;        //adapter for ListView
 
     BaseLoaderCallback mCallBack = new BaseLoaderCallback(this) {
         @Override
@@ -77,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        //load openCV asynchronously using callback
         OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_13, this, mCallBack);
 
         //find and set fab buttons
@@ -92,44 +92,41 @@ public class MainActivity extends AppCompatActivity {
         drawer.addDrawerListener(toggle);
         toggle.syncState();
 
+        //Update ListView
         queryProvider();
     }
 
     public void onClick(View v) {
         switch (v.getId()) {
-            case R.id.fabItem1:
+            case R.id.fabItem1:         //Starts camera for img to process
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                         != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(MainActivity.this,
                             new String[]{Manifest.permission.CAMERA},
-                            CAMERA_REQUEST);
-                } else {
-                    //Intent cameraIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-                    //startActivityForResult(cameraIntent, CAMERA_IMAGE);
-                    startCameraIntent();
-                }
+                            CAM_REQUEST);
+                } else { startCameraIntent(); }
                 break;
-            case R.id.fabItem2:
+            case R.id.fabItem2:         //Starts gallery for image to process
                 Intent imageIntent = new Intent();
                 imageIntent.setType("image/*");
                 imageIntent.setAction(Intent.ACTION_GET_CONTENT);
-                startActivityForResult(Intent.createChooser(imageIntent, "Select Picture"), GALLERY_IMAGE);
+                startActivityForResult(Intent.createChooser(imageIntent, "Select Picture"), GAL_IMAGE);
                 break;
-            case R.id.fabItem3:
+            case R.id.fabItem3:         //Starts new note without img to process
                 queryProvider();
                 Intent intent = new Intent(MainActivity.this, NoteActivity.class);
                 Bundle bundle = new Bundle();
                 bundle.putBoolean("isNewNote", true);
                 bundle.putInt("noteID", lastNoteID + 1);
                 intent.putExtras(bundle);
-                startActivityForResult(intent, 1);
+                startActivityForResult(intent, GAL_ACT);
                 break;
         }
     }
 
     private void startCameraIntent() {
         Intent camIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (camIntent.resolveActivity(getPackageManager()) != null) {
+        if (camIntent.resolveActivity(getPackageManager()) != null) {   //check if there is a camera
             File photoFile = null;
             try {
                 photoFile = createImageFile();
@@ -141,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
             if (photoFile != null) {
                 Uri photoURI = FileProvider.getUriForFile(this, "dom.notescanner.fileprovider", photoFile);
                 camIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                startActivityForResult(camIntent, CAMERA_IMAGE);
+                startActivityForResult(camIntent, CAM_IMAGE);
             }
         }
     }
@@ -158,10 +155,10 @@ public class MainActivity extends AppCompatActivity {
 
     /*Deals with response codes from other activities */
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == 1 && resultCode == RESULT_OK)    //update db if changes made
+        if (requestCode == GAL_ACT && resultCode == RESULT_OK)    //update db if changes made
             queryProvider();
 
-        if (requestCode == GALLERY_IMAGE) {
+        if (requestCode == GAL_IMAGE) {     //returning from gallery, start intent with img
             if (data != null) {
                 Uri uri = data.getData();
                 Intent intent = new Intent(MainActivity.this, GalleryActivity.class);
@@ -169,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
                 intent.putExtra("isCamImg", false);
                 startActivity(intent);
             }
-        } else if (requestCode == CAMERA_IMAGE) {
+        } else if (requestCode == CAM_IMAGE) {      //returning from camera, start intent with img
             if (resultCode == RESULT_CANCELED) {    //delete temp file if no image found.
                 File emptyFile = new File(mCurrentPhotoPath);
                 emptyFile.delete();
@@ -185,7 +182,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
-            case CAMERA_REQUEST:
+            case CAM_REQUEST:
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(MainActivity.this,

@@ -30,7 +30,7 @@ import static org.opencv.core.Core.countNonZero;
 import static org.opencv.core.Core.line;
 import static org.opencv.core.Core.log;
 
-class OcrProcessor {
+class OcrProcessor {    //TODO: Fix to be not package private, localise all methods
     private static final String TAG = "OCRPROC";
     private float aspectRatio;  //Aspect Ratio of image
     private static final float AR_1610 = (float) 1.6;        //aspect ratio 16:10
@@ -45,7 +45,7 @@ class OcrProcessor {
     }
 
     /* Downscales High resolution images to 1080 for easier pre-processing */
-    Mat scaleMat(Mat m) {
+    Mat scaleMat(Mat m) {   //TODO: Create proper scaling, using factor dividing
         int scaleRows, scaleCols;
 
         if (m.rows() > m.cols() && m.rows() > 1920) {   //if image portrait
@@ -77,7 +77,7 @@ class OcrProcessor {
     }
 
     /*Use thresholding to convert noisy image to clean binary image */
-    Mat removeNoise(Mat m, boolean removeLines) {
+    Mat removeNoise(Mat m, boolean removeLines) {   //TODO: need global scale variable/source resolution + isdownscaled to determine binary thresh + lineremoval values
 
         //threshold image to remove noise and invert image for line removal
         Imgproc.cvtColor(m, m, Imgproc.COLOR_BGR2GRAY); //change to greyscale
@@ -111,7 +111,7 @@ class OcrProcessor {
     }
 
     /*find all the text regions in the input matrix using morphology and contouring*/
-    List<Rect> getTextRegionsRects(Mat m) {
+    List<Rect> getTextRegionsRects(Mat m) { //TODO: pass bool iscancelled to stop rect loop
 
         List<Rect> textRegions = new ArrayList<>();
 
@@ -131,8 +131,10 @@ class OcrProcessor {
         Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
         Imgproc.erode(m, m, Mat.ones(new Size(2, 2), 0));
 
+        Log.d(TAG, hierarchy.cols() + " potential text regions found. Processing....");
+        double time = System.currentTimeMillis();
+
         for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {
-            Log.d(TAG, "Processing rect  = " + i);
             Rect rect = Imgproc.boundingRect(contours.get(i));
             Mat maskRegion = new Mat(mask, rect);
             maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
@@ -141,8 +143,11 @@ class OcrProcessor {
             if (rect.height > 16 && rect.width > 12)   //Region is at least 16x12
                 textRegions.add(rect);
         }
+
         Collections.sort(textRegions, new SortRectByPos()); //sort regions top to bottom, left to right
-        return textRegions;
+        Log.d(TAG, "Time to process text regions = " + (float) ((System.currentTimeMillis() - time) / 1000));
+
+        return textRegions; //TODO: Fix case when this is null
     }
 
     /*Iterates through all text boundaries and conditionally insert the coloured boundary to the input matrix */
@@ -194,22 +199,35 @@ class OcrProcessor {
         Mat prevMat = src.submat(prevRect);
         wordList.add(new WordObject(prevMat));
 
+        //TODO: prevrect +15 needs to scale relative to input resolution, same as threshholding cols
         while (ri.hasNext()) {
             Rect curRect = ri.next();
             Mat curMat = src.submat(curRect);
-            double prevRectBuffer = (prevRect.br().x+15 > imgWidth) ?  imgWidth-1 : prevRect.br().x+15;         //need to change this to subtracted difference of two rects
+            double prevRectBuffer = (prevRect.br().x + 15 > imgWidth) ? imgWidth - 1 : prevRect.br().x + 15;         //need to change this to subtracted difference of two rects
             if (curRect.tl().y > prevRect.br().y) {                 //if it is a wordMat on the next line
-                wordList.get(wordList.size()-1).setLineBreak();
+                wordList.get(wordList.size() - 1).setLineBreak();
                 wordList.add(new WordObject(curMat));
-            } else if(curRect.tl().x <= prevRectBuffer) {           //if region is close to previous, merge the two
-                wordList.get(wordList.size()-1).mergeText(curMat);
+            } else if (curRect.tl().x <= prevRectBuffer) {           //if region is close to previous, merge the two
+                wordList.get(wordList.size() - 1).mergeText(curMat);
             } else {
                 wordList.add(new WordObject(curMat));               //if region is far from previous, create separate word
             }
             prevRect = curRect.clone();
         }
 
-        for (WordObject aWordList : wordList) Log.d(TAG, " " + aWordList.getLetters().size() + "| " + aWordList.getLineBreak());
+        StringBuilder s = new StringBuilder();
+        int count = 1;
+        s.append("\n" + "Line 1: ");
+        for (WordObject aWordList : wordList) {
+            String n;
+            if (aWordList.getLineBreak()) {
+                n = aWordList.getLetters().size() + "\nLine " + ++count + ": ";
+            } else {
+                n = aWordList.getLetters().size() + " ";
+            }
+            s.append(n);
+        }
+        Log.i(TAG, " " + s);
     }
 
     /**

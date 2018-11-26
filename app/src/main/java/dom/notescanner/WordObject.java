@@ -25,9 +25,8 @@ public class WordObject {
     }
 
     public void mergeText(Mat mergeWord) {
-
-        wordMat.add(new Mat()); //add clone to wordMat
-        mergeWord.copyTo(wordMat.get(wordMat.size()-1));
+        wordMat.add(new Mat());     //add new matrix to arraylist of words
+        mergeWord.copyTo(wordMat.get(wordMat.size()-1));    //copy mergeword to new matrix
         segmentToLetters(wordMat.size()-1);
     }
 
@@ -51,7 +50,7 @@ public class WordObject {
 
     }
 
-    private ArrayList<Rect> getSegmentationBoxes(Mat src) {
+    private ArrayList<Rect> getSegmentationBoxes(Mat src) { //TODO: implement segmentation
         Mat wordCopy = src.clone();
         int bias = (src.width() > src.cols()*1.5) ? 1 : 0;
         ArrayList<Rect> PSC = new ArrayList<>();
@@ -60,6 +59,4 @@ public class WordObject {
 
         return null;
     }
-
-
 }
