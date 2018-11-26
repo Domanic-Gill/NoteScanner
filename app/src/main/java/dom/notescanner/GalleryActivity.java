@@ -1,9 +1,9 @@
 package dom.notescanner;
+
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Color;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.provider.MediaStore;
@@ -19,16 +19,14 @@ import android.widget.Toast;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
-import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.ml.CvSVM;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 import java.util.List;
 
 public class GalleryActivity extends AppCompatActivity {
@@ -40,6 +38,9 @@ public class GalleryActivity extends AppCompatActivity {
     Boolean removeLines;
     TextView loadingTV;
     Uri uri;
+    boolean isCamera;
+    Bitmap camPhoto;
+    PreProcImgAsync a;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,11 +54,20 @@ public class GalleryActivity extends AppCompatActivity {
         loadingTV = findViewById(R.id.loadingTV);
 
         removeLines = linesCButton.isChecked();
+        linesCButton.setClickable(false);
+        acceptButton.setClickable(false);
 
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
-            uri = Uri.parse(bundle.getString("uri"));
-            new PreProcImgAsync(uri, getApplicationContext(), this, removeLines).execute();
+            isCamera = bundle.getBoolean("isCamImg");
+            if (isCamera) {
+                uri = Uri.parse(bundle.getString("uri"));
+                camPhoto = BitmapFactory.decodeFile(uri.toString());
+            } else {
+                camPhoto = null;
+                uri = Uri.parse(bundle.getString("uri"));
+            }
+            startPreProcessing();
         } else {
             Toast.makeText(GalleryActivity.this, "Failed to retrieve Image!", Toast.LENGTH_SHORT).show();
         }
@@ -67,23 +77,43 @@ public class GalleryActivity extends AppCompatActivity {
         switch (v.getId()) {
             case R.id.acceptButton:
                 break;
-
             case R.id.cancelButton:
-                finish();
+                onBackPressed();
                 break;
             case R.id.linesCButton:
-                if(linesCButton.isClickable()) {
-                    removeLines = linesCButton.isChecked();
-                    linesCButton.setClickable(false);
-                    acceptButton.setClickable(false);
-                    linesCButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
-                    acceptButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
-                    loadingTV.setText(getResources().getString(R.string.text_processing));
-                    new PreProcImgAsync(uri, getApplicationContext(), this, removeLines).execute();
+                if (linesCButton.isClickable()) {
+                    startPreProcessing();
                 }
-
-
+                break;
         }
+    }
+
+    private void startPreProcessing() {
+        removeLines = linesCButton.isChecked();
+        linesCButton.setClickable(false);
+        acceptButton.setClickable(false);
+        linesCButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
+        acceptButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
+        loadingTV.setText(getResources().getString(R.string.text_processing));
+        if (isCamera) {
+            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines);
+            a.execute();
+            //new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines).execute();
+        } else {
+            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines);
+            a.execute();
+           // new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines).execute();
+        }
+
+    }
+
+    @Override
+    public void onBackPressed() {
+        a.cancel(true);
+        File file = new File(uri.toString());
+        boolean deleted = file.delete();
+        if (deleted) Log.d(TAG, "deleted = " + deleted);
+        finish();
     }
 
     public void enableButtons() {
@@ -112,7 +142,7 @@ public class GalleryActivity extends AppCompatActivity {
 
     static class PreProcImgAsync extends AsyncTask<String, Mat, Void>  //weak reference and strong app context needs to be passed
     {
-        private static final String TAG = "GALACTIVITY-ASYNCTASK";      //galactic activity :^)
+        private static final String TAG = "GALACTIVITY-ASYNCTASK";  //debug tag
         private final WeakReference<GalleryActivity> weakActivity;  //weak reference to activity
         private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without ab activity
         private Uri mUri;   //URI of  the image
@@ -121,11 +151,12 @@ public class GalleryActivity extends AppCompatActivity {
         Boolean removeLines;
 
 
-        PreProcImgAsync(Uri uri, final Context appContext, GalleryActivity myActivity, boolean removeLines) {
+        PreProcImgAsync(Uri uri, Bitmap cameraImage, final Context appContext, GalleryActivity myActivity, boolean removeLines) {
             mUri = uri;
             weakActivity = new WeakReference<>(myActivity);
             mAppContext = new WeakReference<>(appContext);
             this.removeLines = removeLines;
+            inputBitmap = cameraImage;
         }
 
 
@@ -141,17 +172,16 @@ public class GalleryActivity extends AppCompatActivity {
             Context appCon;         //Strong reference to application context;
 
             //get the bitmap from URI using app context
-            appCon = mAppContext.get();
-            if (appCon != null) {
-                try {
-                    inputBitmap = MediaStore.Images.Media.getBitmap(appCon.getContentResolver(), mUri);
-                } catch (IOException e) {
-                    e.printStackTrace();
+            if (inputBitmap == null) {
+                appCon = mAppContext.get();
+                if (appCon != null) {
+                    try {
+                        inputBitmap = MediaStore.Images.Media.getBitmap(appCon.getContentResolver(), mUri);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-            } else {
-                Log.e(TAG, "APP CONTEXT IS NULL");
             }
-
             Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
             OcrProcessor ocrProc = new OcrProcessor(inMat);
 
@@ -172,19 +202,25 @@ public class GalleryActivity extends AppCompatActivity {
 
             Mat textRegionMat = noiseMat.clone();
             List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);    //retrieve regions of text
-            Log.d(TAG,textRegions.size() + "TEXT REGIONS DETECTED");
-            Mat tmp = ocrProc.displayTextRegions(noiseMat, textRegions);
-            displayMat = new Mat();
-            displayMat = tmp.clone();       //display regions to matrix
+            Log.d(TAG, textRegions.size() + "TEXT REGIONS DETECTED");
+
+            if (textRegions.size() == 0) {
+                displayMat = noiseMat.clone();
+                Imgproc.cvtColor(displayMat, displayMat, Imgproc.COLOR_GRAY2BGR);
+            } else {
+                Mat tmp = ocrProc.displayTextRegions(noiseMat, textRegions);
+                displayMat = new Mat();
+                displayMat = tmp.clone();       //display regions to matrix
+                tmp.release();
+            }
 
             ocrProc.checkWord2(textRegions, noiseMat);
 
-            tmp.release();
             textRegionMat.release();
             noiseMat.release();
             inMat.release();
 
-           // ocrProc.checkWord(textRegions, noiseMat);
+            // ocrProc.checkWord(textRegions, noiseMat);
 
 
 
@@ -239,8 +275,9 @@ public class GalleryActivity extends AppCompatActivity {
             // Don't update if activity not found
             if (activity == null || activity.isFinishing() || activity.isDestroyed())
                 return;
-
-            ((GalleryActivity) activity).displayMat(values[0], true);
+            //race condition check, possibility that mat is released before progress is updated
+            if (values[0].cols() != 0 && values[0].rows() != 0)
+                ((GalleryActivity) activity).displayMat(values[0], true);
         }
 
         @Override
@@ -248,17 +285,17 @@ public class GalleryActivity extends AppCompatActivity {
             super.onCancelled();
         }
 
-        class SvmLoader implements Runnable{
+        class SvmLoader implements Runnable {
             private OcrProcessor ocrProcessor;
             private Context appContext;
             CvSVM tsvm;
 
-            public SvmLoader(OcrProcessor o, Context c){
+            public SvmLoader(OcrProcessor o, Context c) {
                 ocrProcessor = o;
                 appContext = c;
             }
 
-            public void run(){
+            public void run() {
                 tsvm = ocrProcessor.loadSVM(appContext);
             }
 
