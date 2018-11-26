@@ -5,7 +5,7 @@ import org.opencv.core.Rect;
 
 import java.util.ArrayList;
 
-class WordObject {
+public class WordObject {
     private ArrayList<Mat> letters; //mat array of characters from wordMat
     private boolean isLineBreak;
     private ArrayList<Mat> wordMat;
@@ -51,7 +51,13 @@ class WordObject {
 
     }
 
-    private ArrayList<Rect> getSegmentationBoxes(Mat input) {
+    private ArrayList<Rect> getSegmentationBoxes(Mat src) {
+        Mat wordCopy = src.clone();
+        int bias = (src.width() > src.cols()*1.5) ? 1 : 0;
+        ArrayList<Rect> PSC = new ArrayList<>();
+        ArrayList<Rect> Boxes = new ArrayList<>();
+        //Rect scanRect =
+
         return null;
     }
 

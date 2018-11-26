@@ -120,7 +120,7 @@ class OcrProcessor {
 
         Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
-        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1)); //used to be morph rect
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(12, 1)); //used to be morph rect
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
 
         Mat mask = Mat.zeros(m.size(), CvType.CV_8UC1);
@@ -130,6 +130,7 @@ class OcrProcessor {
         Imgproc.dilate(m, m, Mat.ones(new Size(2, 2), 0));
         Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
         Imgproc.erode(m, m, Mat.ones(new Size(2, 2), 0));
+
         for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {
             Log.d(TAG, "Processing rect  = " + i);
             Rect rect = Imgproc.boundingRect(contours.get(i));
@@ -140,7 +141,7 @@ class OcrProcessor {
             if (rect.height > 16 && rect.width > 12)   //Region is at least 16x12
                 textRegions.add(rect);
         }
-        Collections.sort(textRegions, new SortRectbyPos()); //sort regions top to bottom, left to right
+        Collections.sort(textRegions, new SortRectByPos()); //sort regions top to bottom, left to right
         return textRegions;
     }
 
@@ -270,7 +271,7 @@ class OcrProcessor {
      * This results in the List being sorted from top to bottom, left to
      * right
      */
-    static class SortRectbyPos implements Comparator<Rect> {
+    static class SortRectByPos implements Comparator<Rect> {
         @Override
         public int compare(Rect a, Rect b) {
             if ((a.tl().y <= b.tl().y && a.tl().y + a.height >= b.tl().y) ||
