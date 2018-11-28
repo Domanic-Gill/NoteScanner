@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -32,23 +33,42 @@ import static org.opencv.core.Core.log;
 
 class OcrProcessor {    //TODO: Fix to be not package private, localise all methods
     private static final String TAG = "OCRPROC";
-    private float aspectRatio;  //Aspect Ratio of image
-    private static final float AR_1610 = (float) 1.6;        //aspect ratio 16:10
-    private static final float AR_43 = (float) 1.33;          //aspect ratio 4:3
+    private static final int MAXRES = 2000;   //highest amount of rows/cols an image can be
+    private float aspectRatio;              //Aspect Ratio of image
+    private int sourceCols, sourceRows;     //original resolution of image
+    private float scaleFactor;              //factor that image is downscaled from
     private boolean isDownscaled = false;
 
     OcrProcessor(Mat m) {
+        sourceCols = m.cols();
+        sourceRows = m.rows();
         aspectRatio = (float) m.rows() / (float) m.cols();
-        if (aspectRatio < 1) {
-            aspectRatio = (float) m.cols() / (float) m.rows();
-        }
+        if (aspectRatio < 1) aspectRatio = (float) m.cols() / (float) m.rows();
+
+        if (sourceCols > sourceRows && sourceCols > MAXRES) {
+            scaleFactor = (float) MAXRES / (float) sourceCols;
+        } else if (sourceRows > sourceCols && sourceRows > MAXRES) {
+            scaleFactor = (float) MAXRES / (float) sourceRows;
+        } else scaleFactor = 0;
+
+        Log.d(TAG, "sf = " + scaleFactor + "| sc = " + sourceCols + "| sr = " + sourceRows + "| ar =" + aspectRatio);
     }
 
-    /* Downscales High resolution images to 1080 for easier pre-processing */
+    /* Downscales High resolution images for easier pre-processing */
     Mat scaleMat(Mat m) {   //TODO: Create proper scaling, using factor dividing
-        int scaleRows, scaleCols;
+        //int scaleRows, scaleCols;
 
-        if (m.rows() > m.cols() && m.rows() > 1920) {   //if image portrait
+        if (scaleFactor > 0) {
+            Size s = new Size(sourceCols * scaleFactor, sourceRows * scaleFactor);
+            Imgproc.resize(m, m, s, 0, 0, Imgproc.INTER_AREA);
+            isDownscaled = true;
+        }
+
+        if(sourceRows < 1000 && sourceCols < 1000) {
+            Imgproc.pyrUp(m, m);
+        }
+
+        /*if (m.rows() > m.cols() && m.rows() > 1920) {   //if image portrait
             isDownscaled = true;
             if (aspectRatio > 1.7) {                //if image 16:9
                 scaleRows = m.rows() - 1920;
@@ -72,7 +92,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             Size size = new Size(m.cols() - scaleCols,
                     m.rows() - scaleRows);
             Imgproc.resize(m, m, size);
-        }
+        }*/
         return m;
     }
 
@@ -83,7 +103,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         Imgproc.cvtColor(m, m, Imgproc.COLOR_BGR2GRAY); //change to greyscale
         Imgproc.adaptiveThreshold(m, m, 255,
                 Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
-                Imgproc.THRESH_BINARY, 15, 5); //originally blocksize = 11, c = 2
+                Imgproc.THRESH_BINARY, 15, 5); //default 11 2 now 15 5, sharper on 23 7
 
         //LINE REMOVAL
         if (removeLines) {
@@ -130,11 +150,10 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         Imgproc.dilate(m, m, Mat.ones(new Size(2, 2), 0));
         Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
         Imgproc.erode(m, m, Mat.ones(new Size(2, 2), 0));
-
         Log.d(TAG, hierarchy.cols() + " potential text regions found. Processing....");
         double time = System.currentTimeMillis();
 
-        for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {
+        for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {  //TODO: null detection needed
             Rect rect = Imgproc.boundingRect(contours.get(i));
             Mat maskRegion = new Mat(mask, rect);
             maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
@@ -145,6 +164,28 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         }
 
         Collections.sort(textRegions, new SortRectByPos()); //sort regions top to bottom, left to right
+        /*ListIterator<Rect> tri = textRegions.listIterator();
+        Rect curRect = tri.next();
+        int iteratorPos = 0;
+        while(tri.hasNext()) {
+            boolean deleted = false;
+            Rect nextRect = tri.next();
+            iteratorPos++;
+
+            if (curRect.contains(nextRect.tl()) && curRect.contains(nextRect.br())) {
+                textRegions.remove(iteratorPos);
+                deleted = true;
+            } else if (nextRect.contains(new Point(curRect.tl().x+20, curRect.y+20)) && nextRect.contains(new Point(curRect.tl().x-20, curRect.y-20))) {
+                textRegions.remove(iteratorPos-1);
+                deleted =  true;
+            }
+
+            if (!deleted) {
+                curRect = nextRect;
+
+            }
+        }*/
+
         Log.d(TAG, "Time to process text regions = " + (float) ((System.currentTimeMillis() - time) / 1000));
 
         return textRegions; //TODO: Fix case when this is null
@@ -171,6 +212,10 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
                 colour = new Scalar(0, 255, 0);         //Make green
             } else {
                 colour = new Scalar(255, 0, 0);         //Make red
+            }
+
+            if (i == 3) {
+                colour = new Scalar(0,0,255);
             }
 
             Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
@@ -217,17 +262,23 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         StringBuilder s = new StringBuilder();
         int count = 1;
+        int i = 0;
         s.append("\n" + "Line 1: ");
         for (WordObject aWordList : wordList) {
             String n;
             if (aWordList.getLineBreak()) {
-                n = aWordList.getLetters().size() + "\nLine " + ++count + ": ";
+                n = "(" + i + ")" + aWordList.getLetters().size() + "\nLine " + ++count + ": ";
             } else {
-                n = aWordList.getLetters().size() + " ";
+                n = "(" + i + ")" + aWordList.getLetters().size() + " ";
             }
             s.append(n);
+            i++;
         }
         Log.i(TAG, " " + s);
+
+        //Mat m = new Mat();
+        //wordList.get(6).getLetters().get(0).copyTo(m);
+        //System.out.println(m.dump());
     }
 
     /**
@@ -291,16 +342,12 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
      */
     static class SortRectByPos implements Comparator<Rect> {
         @Override
-        public int compare(Rect a, Rect b) {
-            if ((a.tl().y <= b.tl().y && a.tl().y + a.height >= b.tl().y) ||
-                    (b.tl().y <= a.tl().y && b.tl().y + b.height >= a.tl().y)) {
+        public int compare(Rect a, Rect b) {    // div4 compensates for letters barely on the same line
+            if ((a.tl().y < b.tl().y && a.tl().y + a.height > b.tl().y + b.height / 4) ||
+                    (b.tl().y < a.tl().y && b.tl().y + b.height > a.tl().y + a.height / 4)) {
                 return (a.tl().x < b.tl().x) ? -1 : 1;
-
-            } else {
-                return (a.tl().y < b.tl().y) ? -1 : 1;
-            }
+            } else return Double.compare(a.tl().y, b.tl().y);
         }
-
     }
 
 

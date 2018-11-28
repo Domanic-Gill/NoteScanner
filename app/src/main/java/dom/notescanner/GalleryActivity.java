@@ -213,12 +213,12 @@ public class GalleryActivity extends AppCompatActivity {
                 displayMat = tmp.clone();       //display regions to matrix
                 tmp.release();
             }
-
             ocrProc.checkWord2(textRegions, noiseMat);
 
             textRegionMat.release();
             noiseMat.release();
             inMat.release();
+            textRegions.clear();
 
             // ocrProc.checkWord(textRegions, noiseMat);
 
@@ -282,6 +282,7 @@ public class GalleryActivity extends AppCompatActivity {
 
         @Override
         protected void onCancelled() {
+            //TODO: ocrproc signal global boolean cancelled, only for use in text regions
             super.onCancelled();
         }
 
