@@ -19,8 +19,10 @@ import android.widget.Toast;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.ml.CvSVM;
 
@@ -224,7 +226,7 @@ public class GalleryActivity extends AppCompatActivity {
 
 
 
-            /*Rect rio = textRegions.get(55);
+            /*Rect rio = textRegions.get(6);
             Mat cropped = new Mat(noiseMat, rio);
             Mat sneak = new Mat();
             cropped.copyTo(sneak);

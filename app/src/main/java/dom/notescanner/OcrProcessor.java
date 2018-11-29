@@ -214,7 +214,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
                 colour = new Scalar(255, 0, 0);         //Make red
             }
 
-            if (i == 3) {
+            if (i == 42) {
                 colour = new Scalar(0,0,255);
             }
 
@@ -343,9 +343,9 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     static class SortRectByPos implements Comparator<Rect> {
         @Override
         public int compare(Rect a, Rect b) {    // div4 compensates for letters barely on the same line
-            if ((a.tl().y < b.tl().y && a.tl().y + a.height > b.tl().y + b.height / 4) ||
-                    (b.tl().y < a.tl().y && b.tl().y + b.height > a.tl().y + a.height / 4)) {
-                return (a.tl().x < b.tl().x) ? -1 : 1;
+            if ((a.tl().y <= b.tl().y && a.tl().y + a.height >= b.tl().y + b.height / 4) ||
+                    (b.tl().y <= a.tl().y && b.tl().y + b.height >= a.tl().y + a.height / 4)) {
+                return Double.compare(a.tl().x, b.tl().x);
             } else return Double.compare(a.tl().y, b.tl().y);
         }
     }
