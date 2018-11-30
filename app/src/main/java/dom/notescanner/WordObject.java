@@ -1,9 +1,14 @@
 package dom.notescanner;
 
+import android.util.Log;
+
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
 
 import java.util.ArrayList;
+
+import static org.opencv.core.Core.bitwise_not;
+import static org.opencv.core.Core.countNonZero;
 
 public class WordObject {
     private ArrayList<Mat> letters; //mat array of characters from wordMat
@@ -51,11 +56,14 @@ public class WordObject {
     }
 
     private ArrayList<Rect> getSegmentationBoxes(Mat src) { //TODO: implement segmentation
-        Mat wordCopy = src.clone();
-        int bias = (src.width() > src.cols()*1.5) ? 1 : 0;
-        ArrayList<Rect> PSC = new ArrayList<>();
-        ArrayList<Rect> Boxes = new ArrayList<>();
-        //Rect scanRect =
+
+        for (int i = 0; i < src.cols(); i++) {
+            Mat m = src.col(i);
+            if (i == 5) {
+                double blackPercent = (double) countNonZero(m) / (src.width() * src.height());
+                Log.d("HAHA", "BL = " + blackPercent);
+            }
+        }
 
         return null;
     }
