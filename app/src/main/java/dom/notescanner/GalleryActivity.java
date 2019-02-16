@@ -14,6 +14,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ImageView;
+import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -146,7 +147,7 @@ public class GalleryActivity extends AppCompatActivity {
     {
         private static final String TAG = "GALACTIVITY-ASYNCTASK";  //debug tag
         private final WeakReference<GalleryActivity> weakActivity;  //weak reference to activity
-        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without ab activity
+        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without an activity
         private Uri mUri;   //URI of  the image
         Bitmap inputBitmap; //Bitmap of the Image
         Mat displayMat;   //final Matrix to display to view back in Gallery
@@ -196,11 +197,12 @@ public class GalleryActivity extends AppCompatActivity {
                 z.start();
             }*/
 
-            ocrProc.scaleMat(inMat);    //downscale any high resolution images
-            publishProgress(inMat);             //show downscaled image to ImageView
+            Mat scaleMat = ocrProc.scaleMat(inMat);     //downscale any high resolution images
+            inMat.release();                            //release original image from memory.
 
-            Mat noiseMat = inMat.clone();
-            ocrProc.removeNoise(noiseMat, removeLines); //remove noise from Image
+            publishProgress(scaleMat);                  //show downscaled image to ImageView
+
+            Mat noiseMat = ocrProc.removeNoise(scaleMat, removeLines); //remove noise from Image
 
             Mat textRegionMat = noiseMat.clone();
             List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);    //retrieve regions of text
@@ -217,24 +219,19 @@ public class GalleryActivity extends AppCompatActivity {
             }
             ocrProc.checkWord2(textRegions, noiseMat);
 
-            textRegionMat.release();
-            noiseMat.release();
-            inMat.release();
-            textRegions.clear();
+            //textRegionMat.release();
+           // noiseMat.release();
+           // textRegions.clear();
 
-            // ocrProc.checkWord(textRegions, noiseMat);
+            //displayMat = noiseMat;
 
-
-
-            /*Rect rio = textRegions.get(6);
-            Mat cropped = new Mat(noiseMat, rio);
-            Mat sneak = new Mat();
+            /*Mat sneak = new Mat();
             cropped.copyTo(sneak);
-            Imgproc.resize(sneak, sneak, new Size(28,28));
-            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY);
+            Imgproc.resize(sneak, sneak, new Size(28,28));  //resize to SVM dimensions
+            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY); //invert matrix for the SVM
             Imgproc.dilate(sneak, sneak, Mat.ones(new Size(2, 2), 0));
-            sneak.convertTo(sneak, CvType.CV_32FC1);
-            Mat fin = sneak.reshape(1,1);
+            sneak.convertTo(sneak, CvType.CV_32FC1);    //Convert to floating point as SVM requires floating point values.
+            Mat fin = sneak.reshape(1,1);   //convert into one dimensional matrix for SVM to read
 
             long time = System.currentTimeMillis();
             try {
@@ -258,12 +255,13 @@ public class GalleryActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(Void result) {
             Activity activity = weakActivity.get(); //get strong reference to Gallery activity
-
+            boolean isRGB = displayMat.channels() > 1;
+            Log.d(TAG, "isrgb = " + isRGB);
             //Don't update if activity not found;
             if (activity == null || activity.isFinishing() || activity.isDestroyed())
                 return;
 
-            ((GalleryActivity) activity).displayMat(displayMat, true);
+            ((GalleryActivity) activity).displayMat(displayMat, isRGB);
             ((GalleryActivity) activity).enableButtons();
             displayMat.release();
 

@@ -7,13 +7,10 @@ import org.opencv.core.Rect;
 
 import java.util.ArrayList;
 
-import static org.opencv.core.Core.bitwise_not;
-import static org.opencv.core.Core.countNonZero;
-
 public class WordObject {
-    private ArrayList<Mat> letters; //mat array of characters from wordMat
+    private ArrayList<Mat> letters; //submatrix array of characters from wordMat
+    private ArrayList<Mat> wordMat; //matrix array of words or word segments
     private boolean isLineBreak;
-    private ArrayList<Mat> wordMat;
 
     public WordObject(Mat newWord) {
         isLineBreak = false;
@@ -56,14 +53,6 @@ public class WordObject {
     }
 
     private ArrayList<Rect> getSegmentationBoxes(Mat src) { //TODO: implement segmentation
-
-        for (int i = 0; i < src.cols(); i++) {
-            Mat m = src.col(i);
-            if (i == 5) {
-                double blackPercent = (double) countNonZero(m) / (src.width() * src.height());
-                Log.d("HAHA", "BL = " + blackPercent);
-            }
-        }
 
         return null;
     }

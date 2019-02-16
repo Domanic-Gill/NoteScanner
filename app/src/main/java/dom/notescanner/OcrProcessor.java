@@ -40,7 +40,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     private boolean isDownscaled = false;
 
     /*PARAMETERS*/
-    private static final int MORPHSHIFT_LOW = 5, MORPHSHIFT_MED = 10, MORPHSHIFT_HIGH = 15; //used to be 6 12 18
+    private static final int MORPHSHIFT_LOW = 5, MORPHSHIFT_MED = 12, MORPHSHIFT_HIGH = 15; //used to be 6 12 18
     private static final int[] NOISERED_LOW = {11,2}, NOISERED_MED = {15,5}, NOISERED_HIGH = {23,7};
 
     OcrProcessor(Mat m) {
@@ -59,8 +59,8 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     }
 
     /* Downscales High resolution images for easier pre-processing */
-    Mat scaleMat(Mat m) {   //TODO: Create proper scaling, using factor dividing
-        //int scaleRows, scaleCols;
+    Mat scaleMat(Mat src) {   //TODO: Create proper scaling, using factor dividing
+        Mat m = src.clone();
 
         if (scaleFactor > 0) {
             Size s = new Size(sourceCols * scaleFactor, sourceRows * scaleFactor);
@@ -75,14 +75,16 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     }
 
     /*Use thresholding to convert noisy image to clean binary image */
-    Mat removeNoise(Mat m, boolean removeLines) {   //TODO: need global scale variable/source resolution + isdownscaled to determine binary thresh + lineremoval values
-
+    Mat removeNoise(Mat src, boolean removeLines) {   //TODO: need global scale variable/source resolution + isdownscaled to determine binary thresh + lineremoval values
+        Mat m = src.clone();
         //threshold image to remove noise and invert image for line removal
         Imgproc.cvtColor(m, m, Imgproc.COLOR_BGR2GRAY); //change to greyscale
         Imgproc.adaptiveThreshold(m, m, 255,
                 Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
                 Imgproc.THRESH_BINARY,
                 NOISERED_HIGH[0], NOISERED_HIGH[1]); //default 11 2 now 15 5, sharper on 23 7
+        //Imgproc.GaussianBlur(m, m, new Size(5,5), 0);
+        Imgproc.threshold(m, m, 0, 255, Imgproc.THRESH_OTSU);
 
         //LINE REMOVAL
         if (removeLines) {
@@ -116,13 +118,11 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         List<Rect> textRegions = new ArrayList<>();
 
-        Mat colourMat = new Mat();
-        Imgproc.cvtColor(m, colourMat, Imgproc.COLOR_GRAY2BGR);
-
         Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
-        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(MORPHSHIFT_LOW, 1)); //TODO: higher res = lower width,
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(MORPHSHIFT_HIGH, 1)); //TODO: higher res = lower width,
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
+
 
         Mat mask = Mat.zeros(m.size(), CvType.CV_8UC1);
         List<MatOfPoint> contours = new ArrayList<>();
@@ -131,40 +131,31 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         Imgproc.dilate(m, m, Mat.ones(new Size(2, 2), 0));
         Imgproc.findContours(m, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
         Imgproc.erode(m, m, Mat.ones(new Size(2, 2), 0));
-        Log.d(TAG, hierarchy.cols() + " potential text regions found. Processing....");
+        Log.d(TAG, hierarchy.cols() + " Potential text regions found. Processing....");
         double time = System.currentTimeMillis();
 
         for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {  //TODO: null detection needed
             Rect rect = Imgproc.boundingRect(contours.get(i));
             Mat maskRegion = new Mat(mask, rect);
             maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
-            Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), FILLED); //stop inner rects from acceptance by filling
+            Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), FILLED);     //stop inner rects from acceptance by filling
 
-            if (rect.height > 16 && rect.width > 12 && rect.height < (sourceRows / 8) / scaleFactor)   //Region is at least 16x12
+            if (rect.height > 16 && rect.width > 12)            //Check not to accept very small regions
                 textRegions.add(rect);
         }
 
         Collections.sort(textRegions, new Comparator<Rect>() {
             @Override
-            public int compare(Rect a, Rect b) {
+            public int compare(Rect a, Rect b) {    //Sort regions by height
                 return Integer.compare(a.height, b.height);
             }
         });
 
         int medianPos = (textRegions.size()-1)/2;
-        int medianHeight = textRegions.get(medianPos).height;
-
-        Collections.sort(textRegions, new Comparator<Rect>() {
-            @Override
-            public int compare(Rect a, Rect b) {
-                return Integer.compare(a.width, b.width);
-            }
-        });
-
-        int medianWidth = textRegions.get(medianPos).width;
+        int medianHeight = textRegions.get(medianPos).height;   //Get median position of height sorted regions
 
         for (int i = medianPos; i < textRegions.size(); i++) {
-            if(textRegions.get(i).height > medianHeight*2 && textRegions.get(i).width > medianWidth*2) {
+            if(textRegions.get(i).height > medianHeight*2) {
                 textRegions.remove(i);
                 if (i >= 1) i--;
             }
@@ -192,7 +183,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             bitwise_not(roi, roi);
             double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
             Scalar colour;   //colour of rectangle
-            int thickness = 2;   //thickness of rectangle lines
+            int thickness = 2;   //thickness of rectangle lines that are drawn on the preview
 
             //make region green if at least 6% black, else red
             colour = blackPercent > 0.06 ? new Scalar(0, 255, 0) : new Scalar(255, 0, 0);
@@ -261,6 +252,8 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         //wordList.get(6).getLetters().get(0).copyTo(m);
         //System.out.println(m.dump());
     }
+
+
 
     /**
      * Returns an OpenCV SVM which is loaded from raw resources and

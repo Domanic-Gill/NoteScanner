@@ -45,7 +45,7 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
-    public static final int GAL_IMAGE=42, CAM_IMAGE=43, CAM_REQUEST=44, GAL_ACT=45; //Request codes
+    public static final int GAL_IMAGE=42, CAM_IMAGE=43, CAM_REQUEST=44, NOTE_ACT=45; //Request codes
     private int lastNoteID = 0;                     //id of the final note of the ListView
     private String mCurrentPhotoPath;               //file path of new temporary file
     boolean openCVLoaded;
@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
                 bundle.putBoolean("isNewNote", true);
                 bundle.putInt("noteID", lastNoteID + 1);
                 intent.putExtras(bundle);
-                startActivityForResult(intent, GAL_ACT);
+                startActivityForResult(intent, NOTE_ACT);
                 break;
         }
     }
@@ -155,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
 
     /*Deals with response codes from other activities */
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == GAL_ACT && resultCode == RESULT_OK)    //update db if changes made
+        if (requestCode == NOTE_ACT && resultCode == RESULT_OK)     //update db if changes made
             queryProvider();
 
         if (requestCode == GAL_IMAGE) {     //returning from gallery, start intent with img
@@ -242,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
                 bundle.putString("noteBody", noteBody);
                 intent.putExtras(bundle);
 
-                startActivityForResult(intent, 1);
+                startActivityForResult(intent, NOTE_ACT);
             }
         });
 
