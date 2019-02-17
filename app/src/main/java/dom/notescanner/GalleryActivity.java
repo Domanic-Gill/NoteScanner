@@ -26,10 +26,12 @@ import org.opencv.core.Rect;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.ml.CvSVM;
+import org.w3c.dom.Text;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.List;
 
 public class GalleryActivity extends AppCompatActivity {
@@ -208,7 +210,7 @@ public class GalleryActivity extends AppCompatActivity {
             List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);    //retrieve regions of text
             Log.d(TAG, textRegions.size() + "TEXT REGIONS DETECTED");
 
-            if (textRegions.size() == 0) {
+            /*if (textRegions.size() == 0) {      //WTF IS THIS DOING??
                 displayMat = noiseMat.clone();
                 Imgproc.cvtColor(displayMat, displayMat, Imgproc.COLOR_GRAY2BGR);
             } else {
@@ -216,8 +218,22 @@ public class GalleryActivity extends AppCompatActivity {
                 displayMat = new Mat();
                 displayMat = tmp.clone();       //display regions to matrix
                 tmp.release();
+            }*/
+
+            List<Rect> textRegions2 = new ArrayList<>();
+            ArrayList<TextObject> words = ocrProc.checkword3(textRegions, noiseMat);
+
+            for (TextObject word : words) {
+                textRegions2.add(word.getWord());
             }
-            ocrProc.checkWord2(textRegions, noiseMat);
+            Mat tmp2 = noiseMat.submat(words.get(0).getWord());
+
+           ocrProc.segmentToLetters(words, noiseMat);
+
+            Mat tmp = ocrProc.displayTextRegions(noiseMat, textRegions2);
+            displayMat = new Mat();
+            displayMat = tmp.clone();       //display regions to matrix
+            tmp.release();
 
             //textRegionMat.release();
            // noiseMat.release();

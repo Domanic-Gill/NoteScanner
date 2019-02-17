@@ -33,10 +33,12 @@ import static org.opencv.core.Core.log;
 
 class OcrProcessor {    //TODO: Fix to be not package private, localise all methods
     private static final String TAG = "OCRPROC";
-    private static final int MAXRES = 2000;   //highest amount of rows/cols an image can be
-    private float aspectRatio;              //Aspect Ratio of image
-    private int sourceCols, sourceRows;     //original resolution of image
-    private float scaleFactor;              //factor that image is downscaled from
+
+    private boolean isCancelled = false;
+    private static final int MAXRES = 2000;     //highest amount of rows/cols an image can be
+    private float aspectRatio;                  //Aspect Ratio of image
+    private int sourceCols, sourceRows;         //original resolution of image
+    private float scaleFactor;                  //factor that image is downscaled from
     private boolean isDownscaled = false;
 
     /*PARAMETERS*/
@@ -134,7 +136,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         Log.d(TAG, hierarchy.cols() + " Potential text regions found. Processing....");
         double time = System.currentTimeMillis();
 
-        for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {  //TODO: null detection needed
+        for (int i = (int) hierarchy.get(0, 0)[0]; i >= 0; i = (int) hierarchy.get(0, i)[0]) {  //TODO: null detection needed and cancel detection in here
             Rect rect = Imgproc.boundingRect(contours.get(i));
             Mat maskRegion = new Mat(mask, rect);
             maskRegion.setTo(new Scalar(0, 0, 0), maskRegion);
@@ -208,52 +210,73 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         return new Mat(colMat, r);
     }
 
-    public void checkWord2(List<Rect> r, Mat src) {
-        double imgWidth = src.width();
-        ArrayList<WordObject> wordList = new ArrayList<>();
-        ListIterator<Rect> ri = r.listIterator();
-        Rect prevRect = ri.next();
-        Mat prevMat = src.submat(prevRect);
-        wordList.add(new WordObject(prevMat));
+    ArrayList<TextObject> checkword3(List<Rect> wordRegions, Mat src) {
+        ArrayList<TextObject> wordList = new ArrayList<>();
+        ListIterator<Rect> wrI = wordRegions.listIterator();
+        Rect prevRect = wrI.next();
+        wordList.add(new TextObject(prevRect));
 
-        //TODO: prevrect +15 needs to scale relative to input resolution, same as threshholding cols
-        while (ri.hasNext()) {
-            Rect curRect = ri.next();
-            Mat curMat = src.submat(curRect);
-            double prevRectBuffer = (prevRect.br().x + 15 > imgWidth) ? imgWidth - 1 : prevRect.br().x + 15;         //need to change this to subtracted difference of two rects
+        while (wrI.hasNext()) {
+            Rect curRect = wrI.next();
+            double prevRectBuffer =  prevRect.br().x + 15;         //need to change this to subtracted difference of two rects
+
             if (curRect.tl().y > prevRect.br().y) {                 //if it is a wordMat on the next line
                 wordList.get(wordList.size() - 1).setLineBreak();
-                wordList.add(new WordObject(curMat));
+                wordList.add(new TextObject(curRect));
             } else if (curRect.tl().x <= prevRectBuffer) {           //if region is close to previous, merge the two
-                wordList.get(wordList.size() - 1).mergeText(curMat);
+                wordList.get(wordList.size() - 1).mergeWord(curRect);
+
             } else {
-                wordList.add(new WordObject(curMat));               //if region is far from previous, create separate word
+                wordList.add(new TextObject(curRect));               //if region is far from previous, create separate word
             }
             prevRect = curRect.clone();
         }
+
+        System.out.println(wordList.size() + " WORDS DETECTED");
 
         StringBuilder s = new StringBuilder();
         int count = 1;
         int i = 0;
         s.append("\n" + "Line 1: ");
-        for (WordObject aWordList : wordList) {
-            String n;
+        for (TextObject aWordList : wordList) {
+            String textStructure;
             if (aWordList.getLineBreak()) {
-                n = "(" + i + ")" + aWordList.getLetters().size() + "\nLine " + ++count + ": ";
+                textStructure = "(" + i + ")" + "1" + "\nLine " + ++count + ": ";
             } else {
-                n = "(" + i + ")" + aWordList.getLetters().size() + " ";
+                textStructure = "(" + i + ")" + "1 " + " ";
             }
-            s.append(n);
+            s.append(textStructure);
             i++;
         }
-        Log.i(TAG, " " + s);
 
-        //Mat m = new Mat();
-        //wordList.get(6).getLetters().get(0).copyTo(m);
-        //System.out.println(m.dump());
+        Log.i(TAG, " " + s);
+        return wordList;
     }
 
+    public void segmentToLetters(ArrayList<TextObject> words, Mat src) {
+        for (TextObject aword : words) {
 
+            System.out.println("WORKING ON RECT " + aword.getWord().tl().x + " | " +  aword.getWord().br().x + " | " + words.size());
+            Mat tmp = src.submat(aword.getWord());
+            Mat wordMat = tmp.clone();
+            Core.bitwise_not(wordMat, wordMat);
+            List<Integer> potWS = new ArrayList<>();
+            
+            for (int i = 0; i < wordMat.cols(); i++) {
+                Mat column = wordMat.col(i);
+                int nonzero = countNonZero(column);
+                float percent = ((float) nonzero / (float) wordMat.cols()) * 100;
+
+                if (percent < (float) 5) {
+                    potWS.add(i);
+                    Core.line(src, new Point(aword.getWord().tl().x+i, aword.getWord().tl().y), new Point(aword.getWord().tl().x+i, aword.getWord().br().y), new Scalar(0,0,255));
+                }
+            }
+
+            System.out.println("POTENTIAL WHITESPACES: " + potWS);
+        }
+
+    }
 
     /**
      * Returns an OpenCV SVM which is loaded from raw resources and
