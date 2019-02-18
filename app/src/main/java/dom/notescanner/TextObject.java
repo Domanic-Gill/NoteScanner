@@ -30,7 +30,14 @@ public class TextObject {
     public void mergeWord(Rect r) {
         Rect mergeRegion = r.clone();
         Point tl, br;
-        if (mergeRegion.tl().y < word.tl().y) {     //taller region gets priority
+        double tlX, tlY, brX, brY;
+
+        tlX = (mergeRegion.tl().x <= word.tl().x) ? mergeRegion.tl().x : word.tl().x;
+        tlY = (mergeRegion.tl().y <= word.tl().y) ? mergeRegion.tl().y : word.tl().y;
+        brX = (mergeRegion.br().x >= word.br().x) ? mergeRegion.br().x : word.br().x;
+        brY = (mergeRegion.br().y >= word.br().y) ? mergeRegion.br().y : word.br().y;
+
+        /*if (mergeRegion.tl().y < word.tl().y) {     //taller region gets priority
             tl = new Point(word.tl().x, mergeRegion.tl().y);
         } else {
             tl = new Point(word.tl().x, word.tl().y);
@@ -41,9 +48,10 @@ public class TextObject {
             br = new Point(mergeRegion.br().x, mergeRegion.br().y);
         } else {
             br = new Point(mergeRegion.br().x, word.br().y);
-        }
+        }*/
 
-        Rect tmp = new Rect(tl, br);
+        Rect tmp = new Rect(new Point(tlX, tlY), new Point(brX, brY));
+        //Rect tmp = new Rect(tl, br);
         word = tmp.clone();
 
 
