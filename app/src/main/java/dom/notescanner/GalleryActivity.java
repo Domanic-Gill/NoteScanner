@@ -40,7 +40,6 @@ public class GalleryActivity extends AppCompatActivity {
     ImageView imgPrevView;
     Button cancelButton, acceptButton;
     CheckBox linesCButton;
-    Boolean removeLines;
     TextView loadingTV;
     Uri uri;
     boolean isCamera;
@@ -58,7 +57,6 @@ public class GalleryActivity extends AppCompatActivity {
         linesCButton = findViewById(R.id.linesCButton);
         loadingTV = findViewById(R.id.loadingTV);
 
-        removeLines = linesCButton.isChecked();
         linesCButton.setClickable(false);
         acceptButton.setClickable(false);
 
@@ -94,18 +92,17 @@ public class GalleryActivity extends AppCompatActivity {
     }
 
     private void startPreProcessing() {
-        removeLines = linesCButton.isChecked();
         linesCButton.setClickable(false);
         acceptButton.setClickable(false);
         linesCButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
         acceptButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
         loadingTV.setText(getResources().getString(R.string.text_processing));
         if (isCamera) {
-            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines);
+            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, linesCButton.isChecked());
             a.execute();
             //new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines).execute();
         } else {
-            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines);
+            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, linesCButton.isChecked());
             a.execute();
            // new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines).execute();
         }

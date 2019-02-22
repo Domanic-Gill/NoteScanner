@@ -43,7 +43,7 @@
         <CheckBox
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:checked="true"
+            android:checked="false"
             android:clickable="false"
             android:onClick="onClick"
             android:textColor="@color/colorTextGrey"

@@ -43,7 +43,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
     /*PARAMETERS*/
     private static final int MORPHSHIFT_LOW = 5, MORPHSHIFT_MED = 12, MORPHSHIFT_HIGH = 15; //used to be 6 12 18
-    private static final int[] NOISERED_LOW = {11,2}, NOISERED_MED = {15,5}, NOISERED_HIGH = {23,7};
+    private static final int[] NOISERED_LOW = {11, 2}, NOISERED_MED = {15, 5}, NOISERED_HIGH = {23, 7};
 
     OcrProcessor(Mat m) {
         sourceCols = m.cols();
@@ -64,13 +64,14 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     Mat scaleMat(Mat src) {   //TODO: Create proper scaling, using factor dividing
         Mat m = src.clone();
 
+
         if (scaleFactor > 0) {
             Size s = new Size(sourceCols * scaleFactor, sourceRows * scaleFactor);
             Imgproc.resize(m, m, s, 0, 0, Imgproc.INTER_AREA);
             isDownscaled = true;
         }
 
-        if(sourceRows < 1000 && sourceCols < 1000) {
+        if (sourceRows < 1000 && sourceCols < 1000) {
             Imgproc.pyrUp(m, m);
         }
         return m;
@@ -153,11 +154,11 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             }
         });
 
-        int medianPos = (textRegions.size()-1)/2;
+        int medianPos = (textRegions.size() - 1) / 2;
         int medianHeight = textRegions.get(medianPos).height;   //Get median position of height sorted regions
 
         for (int i = medianPos; i < textRegions.size(); i++) {
-            if(textRegions.get(i).height > medianHeight*2) {
+            if (textRegions.get(i).height > medianHeight * 2) {
                 textRegions.remove(i);
                 if (i >= 1) i--;
             }
@@ -184,14 +185,11 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             Mat roi = dst.submat(region);
             bitwise_not(roi, roi);
             double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
-            Scalar colour;   //colour of rectangle
-            int thickness = 2;   //thickness of rectangle lines that are drawn on the preview
+            Scalar colour;          //colour of rectangle
+            int thickness = 2;      //thickness of rectangle lines that are drawn on the preview
 
             //make region green if at least 6% black, else red
             colour = blackPercent > 0.06 ? new Scalar(0, 255, 0) : new Scalar(255, 0, 0);
-
-            //if (i <= 8) colour = new Scalar(0, 0, 255);
-
             Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
         }
 
@@ -218,14 +216,13 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         while (wrI.hasNext()) {
             Rect curRect = wrI.next();
-            double prevRectBuffer =  prevRect.br().x + 15;         //need to change this to subtracted difference of two rects
+            double prevRectBuffer = prevRect.br().x + 15;         //need to change this to subtracted difference of two rects
 
             if (curRect.tl().y > prevRect.br().y) {                 //if it is a wordMat on the next line
                 wordList.get(wordList.size() - 1).setLineBreak();
                 wordList.add(new TextObject(curRect));
             } else if (curRect.tl().x <= prevRectBuffer) {           //if region is close to previous, merge the two
                 wordList.get(wordList.size() - 1).mergeWord(curRect);
-
             } else {
                 wordList.add(new TextObject(curRect));               //if region is far from previous, create separate word
             }
@@ -254,28 +251,72 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     }
 
     public void segmentToLetters(ArrayList<TextObject> words, Mat src) {
-        for (TextObject aword : words) {
 
-            System.out.println("WORKING ON RECT " + aword.getWord().tl().x + " | " +  aword.getWord().br().x + " | " + words.size());
+        for (TextObject aword : words) {
             Mat tmp = src.submat(aword.getWord());
             Mat wordMat = tmp.clone();
-            Core.bitwise_not(wordMat, wordMat);
-            List<Integer> potWS = new ArrayList<>();
-            
+            Core.bitwise_not(wordMat, wordMat);         //invert word matrix to view non zero values
+            List<Integer> potWS = new ArrayList<>();    //integer list of all potential word segments
+
             for (int i = 0; i < wordMat.cols(); i++) {
                 Mat column = wordMat.col(i);
                 int nonzero = countNonZero(column);
-                float percent = ((float) nonzero / (float) wordMat.cols()) * 100;
+                float percent = ((float) nonzero / (float) wordMat.rows()) * 100;
 
                 if (percent < (float) 5) {
                     potWS.add(i);
-                    Core.line(src, new Point(aword.getWord().tl().x+i, aword.getWord().tl().y), new Point(aword.getWord().tl().x+i, aword.getWord().br().y), new Scalar(0,0,255));
                 }
             }
 
-            System.out.println("POTENTIAL WHITESPACES: " + potWS);
-        }
+            /*Potential word segment lines that are close together are merged here*/
+            int prevCol, curCol;
+            for (int i = 0; i < potWS.size()-1; i++) {
+                prevCol = potWS.get(i); curCol = potWS.get(i+1);
+                int colDiff = curCol - prevCol;
+                if (colDiff <= 7 && colDiff > 1) {
+                    for (int j = 0; j < colDiff; j++) {
+                        potWS.add((j+1) + prevCol);
+                    }
+                    i = i + colDiff-1;
+                }
+            }
 
+            /*Sort lines into rectangles for further analysis, exclude thin lines */
+            List<Rect> potWsRects = new ArrayList<>();
+            System.out.println("MERGED WHITESPACES" + potWS);
+            System.out.println("MERGED SIZE = " + potWS.size());
+            int colSize = 1;
+            int startIndex = 0, endIndex;
+            for (int x = 1; x < potWS.size()-1; x++) {
+                if (x == 1) {
+                    startIndex = potWS.get(x - 1);
+                }
+
+                endIndex = potWS.get(x);
+
+                if (endIndex - startIndex == 1) {
+                    colSize++;
+                } else {
+                    if (colSize > 1) {
+                        Point tl = new Point(aword.getWord().tl().x + startIndex - colSize, aword.getWord().tl().y);
+                        Point br = new Point(aword.getWord().tl().x + startIndex, aword.getWord().br().y);
+                        potWsRects.add(new Rect(tl, br));
+                    }
+                    colSize = 0;
+                }
+                startIndex = endIndex;
+            }
+
+
+            for (int j = 0; j < potWsRects.size(); j++) {
+                Core.rectangle(src, potWsRects.get(j).tl(), potWsRects.get(j).br(), new Scalar(0,0,255), FILLED);
+            }
+
+            for (int i : potWS){
+               //Core.line(src, new Point(aword.getWord().tl().x + i, aword.getWord().tl().y), new Point(aword.getWord().tl().x + i, aword.getWord().br().y), new Scalar(0, 0, 255));
+            }
+
+        }
     }
 
     /**
