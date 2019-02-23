@@ -269,22 +269,25 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             }
 
             /*Potential word segment lines that are close together are merged here*/
-            int prevCol, curCol;
-            for (int i = 0; i < potWS.size()-1; i++) {
-                prevCol = potWS.get(i); curCol = potWS.get(i+1);
-                int colDiff = curCol - prevCol;
-                if (colDiff <= 7 && colDiff > 1) {
-                    for (int j = 0; j < colDiff; j++) {
-                        potWS.add((j+1) + prevCol);
-                    }
-                    i = i + colDiff-1;
+            int sI = 0, cI;
+            for (int x = 1; x < potWS.size()-1; x++) {
+                if (x == 1) {
+                    sI = potWS.get(x-1);
                 }
+                cI = potWS.get(x);
+                if(cI - sI <= 7 && cI - sI > 1  ) {
+                    for(int j = 1; j < (cI - sI); j++) {
+                      potWS.add(j + sI);
+                    }
+                }
+                sI = cI;
             }
+
+            Collections.sort(potWS);
 
             /*Sort lines into rectangles for further analysis, exclude thin lines */
             List<Rect> potWsRects = new ArrayList<>();
-            System.out.println("MERGED WHITESPACES" + potWS);
-            System.out.println("MERGED SIZE = " + potWS.size());
+            //System.out.println("MERGED SIZE = " + potWS.size());
             int colSize = 1;
             int startIndex = 0, endIndex;
             for (int x = 1; x < potWS.size()-1; x++) {
@@ -307,13 +310,23 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
                 startIndex = endIndex;
             }
 
+            List<Integer> segLines = new ArrayList<>();
 
-            for (int j = 0; j < potWsRects.size(); j++) {
-                Core.rectangle(src, potWsRects.get(j).tl(), potWsRects.get(j).br(), new Scalar(0,0,255), FILLED);
+
+            //for (int j = 0; j < potWsRects.size(); j++) {
+            //    Core.rectangle(src, potWsRects.get(j).tl(), potWsRects.get(j).br(), new Scalar(0,0,255), FILLED);
+            //}
+
+            System.out.println("AMOUNT = "+ potWsRects.size());
+
+            /*Thin the segmentation columns and remove faulty segmentation columns*/
+            for (int x = 0; x < potWsRects.size();x++) {
+                Rect column = potWsRects.get(x);
+                segLines.add((int)(column.tl().x) + column.width/2);
             }
 
-            for (int i : potWS){
-               //Core.line(src, new Point(aword.getWord().tl().x + i, aword.getWord().tl().y), new Point(aword.getWord().tl().x + i, aword.getWord().br().y), new Scalar(0, 0, 255));
+            for (int i : segLines){
+               Core.line(src, new Point(i, aword.getWord().tl().y), new Point(i, aword.getWord().br().y), new Scalar(0, 0, 255));
             }
 
         }
