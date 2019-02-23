@@ -208,7 +208,48 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         return new Mat(colMat, r);
     }
 
-    ArrayList<TextObject> checkword3(List<Rect> wordRegions, Mat src) {
+    /*Iterates through all text boundaries and conditionally insert the coloured boundary to the input matrix */
+    Mat displayTextRegions2(Mat dst, List<TextObject> words) {
+        Mat colMat = dst.clone();   //colour version of input matrix
+        Imgproc.cvtColor(dst, colMat, Imgproc.COLOR_GRAY2BGR);
+        double minRectY = words.get(0).getWord().tl().y;
+        double maxRectY = words.get(words.size() - 1).getWord().br().y;
+
+        for (int i = 0; i < words.size(); i++) {
+            Rect region = words.get(i).getWord();
+            if (region.tl().y < minRectY) minRectY = region.tl().y;
+            if (region.br().y > maxRectY) maxRectY = region.br().y;
+            Mat roi = dst.submat(region);
+            bitwise_not(roi, roi);
+            double blackPercent = (double) countNonZero(roi) / (region.width * region.height);
+            Scalar colour;          //colour of rectangle
+            int thickness = 2;      //thickness of rectangle lines that are drawn on the preview
+
+            //make region green if at least 6% black, else red
+            colour = blackPercent > 0.06 ? new Scalar(0, 255, 0) : new Scalar(255, 0, 0);
+            Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
+
+            for (int j : words.get(i).getSegColumns()) {
+                Core.line(colMat, new Point(j, region.tl().y), new Point(j, region.br().y), new Scalar(0, 0, 255), 3);
+            }
+        }
+
+        //Create cropped image of Region of Interest if there is space
+        Point minRectPoint;
+        Point maxRectPoint;
+        if (maxRectY < colMat.height() - 10 && minRectY > 10) {
+            minRectPoint = new Point(0, minRectY - 10);
+            maxRectPoint = new Point((double) colMat.width(), maxRectY + 10);
+        } else {
+            minRectPoint = new Point(0, minRectY);
+            maxRectPoint = new Point((double) colMat.width(), maxRectY);
+        }
+        Rect r = new Rect(minRectPoint, maxRectPoint);
+
+        return new Mat(colMat, r);
+    }
+
+    ArrayList<TextObject> generateTextObject(List<Rect> wordRegions) {
         ArrayList<TextObject> wordList = new ArrayList<>();
         ListIterator<Rect> wrI = wordRegions.listIterator();
         Rect prevRect = wrI.next();
@@ -229,7 +270,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             prevRect = curRect.clone();
         }
 
-        System.out.println(wordList.size() + " WORDS DETECTED");
+        /*System.out.println(wordList.size() + " WORDS DETECTED");
 
         StringBuilder s = new StringBuilder();
         int count = 1;
@@ -246,90 +287,84 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             i++;
         }
 
-        Log.i(TAG, " " + s);
+        Log.i(TAG, " " + s)*/
         return wordList;
     }
 
-    public void segmentToLetters(ArrayList<TextObject> words, Mat src) {
+    public List<Integer> segmentToLetters(Rect word, Mat src) {
 
-        for (TextObject aword : words) {
-            Mat tmp = src.submat(aword.getWord());
-            Mat wordMat = tmp.clone();
-            Core.bitwise_not(wordMat, wordMat);         //invert word matrix to view non zero values
-            List<Integer> potWS = new ArrayList<>();    //integer list of all potential word segments
+        Mat tmp = src.submat(word);
+        Mat wordMat = tmp.clone();
+        Core.bitwise_not(wordMat, wordMat);         //invert word matrix to view non zero values
+        List<Integer> potWS = new ArrayList<>();    //integer list of all potential word segments
 
-            for (int i = 0; i < wordMat.cols(); i++) {
-                Mat column = wordMat.col(i);
-                int nonzero = countNonZero(column);
-                float percent = ((float) nonzero / (float) wordMat.rows()) * 100;
+        for (int i = 0; i < wordMat.cols(); i++) {
+            Mat column = wordMat.col(i);
+            int nonzero = countNonZero(column);
+            float percent = ((float) nonzero / (float) wordMat.rows()) * 100;
 
-                if (percent < (float) 5) {
-                    potWS.add(i);
-                }
+            if (percent < (float) 5) {
+                potWS.add(i);
             }
-
-            /*Potential word segment lines that are close together are merged here*/
-            int sI = 0, cI;
-            for (int x = 1; x < potWS.size()-1; x++) {
-                if (x == 1) {
-                    sI = potWS.get(x-1);
-                }
-                cI = potWS.get(x);
-                if(cI - sI <= 7 && cI - sI > 1  ) {
-                    for(int j = 1; j < (cI - sI); j++) {
-                      potWS.add(j + sI);
-                    }
-                }
-                sI = cI;
-            }
-
-            Collections.sort(potWS);
-
-            /*Sort lines into rectangles for further analysis, exclude thin lines */
-            List<Rect> potWsRects = new ArrayList<>();
-            //System.out.println("MERGED SIZE = " + potWS.size());
-            int colSize = 1;
-            int startIndex = 0, endIndex;
-            for (int x = 1; x < potWS.size()-1; x++) {
-                if (x == 1) {
-                    startIndex = potWS.get(x - 1);
-                }
-
-                endIndex = potWS.get(x);
-
-                if (endIndex - startIndex == 1) {
-                    colSize++;
-                } else {
-                    if (colSize > 1) {
-                        Point tl = new Point(aword.getWord().tl().x + startIndex - colSize, aword.getWord().tl().y);
-                        Point br = new Point(aword.getWord().tl().x + startIndex, aword.getWord().br().y);
-                        potWsRects.add(new Rect(tl, br));
-                    }
-                    colSize = 0;
-                }
-                startIndex = endIndex;
-            }
-
-            List<Integer> segLines = new ArrayList<>();
-
-
-            //for (int j = 0; j < potWsRects.size(); j++) {
-            //    Core.rectangle(src, potWsRects.get(j).tl(), potWsRects.get(j).br(), new Scalar(0,0,255), FILLED);
-            //}
-
-            System.out.println("AMOUNT = "+ potWsRects.size());
-
-            /*Thin the segmentation columns and remove faulty segmentation columns*/
-            for (int x = 0; x < potWsRects.size();x++) {
-                Rect column = potWsRects.get(x);
-                segLines.add((int)(column.tl().x) + column.width/2);
-            }
-
-            for (int i : segLines){
-               Core.line(src, new Point(i, aword.getWord().tl().y), new Point(i, aword.getWord().br().y), new Scalar(0, 0, 255));
-            }
-
         }
+
+        /*Potential word segment lines that are close together are merged here*/
+        int sI = 0, cI;
+        for (int x = 1; x < potWS.size() - 1; x++) {
+            if (x == 1) {
+                sI = potWS.get(x - 1);
+            }
+            cI = potWS.get(x);
+            if (cI - sI <= 7 && cI - sI > 1) {
+                for (int j = 1; j < (cI - sI); j++) {
+                    potWS.add(j + sI);
+                }
+            }
+            sI = cI;
+        }
+
+        Collections.sort(potWS);
+
+        /*Sort lines into rectangles for further analysis, exclude thin lines */
+        List<Rect> potWsRects = new ArrayList<>();
+        int colSize = 1;
+        int startIndex = 0, endIndex;
+        for (int x = 1; x < potWS.size() - 1; x++) {
+            if (x == 1) {
+                startIndex = potWS.get(x - 1);
+            }
+
+            endIndex = potWS.get(x);
+
+            if (endIndex - startIndex == 1) {
+                colSize++;
+            } else {
+                if (colSize > 1) {
+                    Point tl = new Point(word.tl().x + startIndex - colSize, word.tl().y);
+                    Point br = new Point(word.tl().x + startIndex, word.br().y);
+                    potWsRects.add(new Rect(tl, br));
+                }
+                colSize = 0;
+            }
+            startIndex = endIndex;
+        }
+
+        List<Integer> segLines = new ArrayList<>();
+
+        /*Thin the segmentation columns and remove faulty segmentation columns*/
+        for (int x = 0; x < potWsRects.size(); x++) {
+            Rect column = potWsRects.get(x);
+            segLines.add((int) (column.tl().x) + column.width / 2);
+        }
+
+        //for (int j = 0; j < potWsRects.size(); j++) {
+        //    Core.rectangle(src, potWsRects.get(j).tl(), potWsRects.get(j).br(), new Scalar(0,0,255), FILLED);
+        //}
+
+        //  for (int i : segLines){
+        //    Core.line(src, new Point(i, aword.getWord().tl().y), new Point(i, aword.getWord().br().y), new Scalar(0, 0, 255));
+        // }
+        return segLines;
     }
 
     /**

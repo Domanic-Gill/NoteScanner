@@ -5,10 +5,14 @@ import org.opencv.core.Point;
 import org.opencv.core.Rect;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class TextObject {
     private Rect word;              //Rectangles containing all words detected
-    private ArrayList<MatOfPoint> segColumns;   //segmentation lines
+
+
+
+    private List<Integer> segColumns;   //segmentation lines
     private boolean isLineBreak;                // haha nice
 
     public TextObject(Rect newWord) {
@@ -25,7 +29,12 @@ public class TextObject {
     public boolean getLineBreak() {
         return isLineBreak;
     }
-
+    public void setSegColumns(List<Integer> segColumns) {
+        this.segColumns = segColumns;
+    }
+    public List<Integer> getSegColumns() {
+        return segColumns;
+    }
 
     public void mergeWord(Rect r) {
         Rect mergeRegion = r.clone();

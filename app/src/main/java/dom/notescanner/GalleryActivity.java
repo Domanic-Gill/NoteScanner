@@ -217,17 +217,21 @@ public class GalleryActivity extends AppCompatActivity {
                 tmp.release();
             }*/
 
-            List<Rect> textRegions2 = new ArrayList<>();
-            ArrayList<TextObject> words = ocrProc.checkword3(textRegions, noiseMat);
 
-            for (TextObject word : words) {
-                textRegions2.add(word.getWord());
+            ArrayList<TextObject> words = ocrProc.generateTextObject(textRegions);
+
+            for (int i = 0; i < words.size(); i++) {
+                Rect wordRegion = words.get(i).getWord();
+                words.get(i).setSegColumns(ocrProc.segmentToLetters(wordRegion, noiseMat));
             }
-            Mat tmp2 = noiseMat.submat(words.get(0).getWord());
 
-           ocrProc.segmentToLetters(words, noiseMat);
+            //List<Rect> mergedTextRegions = new ArrayList<>();
+            //for (TextObject word : words) {
+            //    mergedTextRegions.add(word.getWord());
+            //}
 
-            Mat tmp = ocrProc.displayTextRegions(noiseMat, textRegions2);
+            //Mat tmp = ocrProc.displayTextRegions(noiseMat, mergedTextRegions);
+            Mat tmp = ocrProc.displayTextRegions2(noiseMat, words);
             displayMat = new Mat();
             displayMat = tmp.clone();       //display regions to matrix
             tmp.release();
