@@ -86,7 +86,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
                 Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
                 Imgproc.THRESH_BINARY,
                 NOISERED_HIGH[0], NOISERED_HIGH[1]); //default 11 2 now 15 5, sharper on 23 7
-        //Imgproc.GaussianBlur(m, m, new Size(5,5), 0);
+        Imgproc.GaussianBlur(m, m, new Size(3,3), 0);
         Imgproc.threshold(m, m, 0, 255, Imgproc.THRESH_OTSU);
 
         //LINE REMOVAL
@@ -209,7 +209,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     }
 
     /*Iterates through all text boundaries and conditionally insert the coloured boundary to the input matrix */
-    Mat displayTextRegions2(Mat dst, List<TextObject> words) {
+    Mat displayTextRegions2(Mat dst, List<TextObject> words, boolean showSegLines) {
         Mat colMat = dst.clone();   //colour version of input matrix
         Imgproc.cvtColor(dst, colMat, Imgproc.COLOR_GRAY2BGR);
         double minRectY = words.get(0).getWord().tl().y;
@@ -228,9 +228,10 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             //make region green if at least 6% black, else red
             colour = blackPercent > 0.06 ? new Scalar(0, 255, 0) : new Scalar(255, 0, 0);
             Core.rectangle(colMat, region.tl(), region.br(), colour, thickness);
-
-            for (int j : words.get(i).getSegColumns()) {
-                Core.line(colMat, new Point(j, region.tl().y), new Point(j, region.br().y), new Scalar(0, 0, 255), 3);
+            if (showSegLines) {
+                for (int j : words.get(i).getSegColumns()) {
+                    Core.line(colMat, new Point(j, region.tl().y), new Point(j, region.br().y), new Scalar(0, 0, 255), 2);
+                }
             }
         }
 
@@ -310,7 +311,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         /*Potential word segment lines that are close together are merged here*/
         int sI = 0, cI;
-        for (int x = 1; x < potWS.size() - 1; x++) {
+        for (int x = 1; x < potWS.size(); x++) {
             if (x == 1) {
                 sI = potWS.get(x - 1);
             }
@@ -329,21 +330,19 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         List<Rect> potWsRects = new ArrayList<>();
         int colSize = 1;
         int startIndex = 0, endIndex;
-        for (int x = 1; x < potWS.size() - 1; x++) {
+        for (int x = 1; x < potWS.size(); x++) {
             if (x == 1) {
                 startIndex = potWS.get(x - 1);
             }
 
             endIndex = potWS.get(x);
 
-            if (endIndex - startIndex == 1) {
+            if ((endIndex - startIndex) <= 1) {
                 colSize++;
             } else {
-                if (colSize > 1) {
                     Point tl = new Point(word.tl().x + startIndex - colSize, word.tl().y);
                     Point br = new Point(word.tl().x + startIndex, word.br().y);
                     potWsRects.add(new Rect(tl, br));
-                }
                 colSize = 0;
             }
             startIndex = endIndex;
@@ -354,7 +353,10 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         /*Thin the segmentation columns and remove faulty segmentation columns*/
         for (int x = 0; x < potWsRects.size(); x++) {
             Rect column = potWsRects.get(x);
-            segLines.add((int) (column.tl().x) + column.width / 2);
+            if (column.width > 1)
+                segLines.add((int) (column.tl().x) + column.width / 2);
+            else
+                segLines.add((int) (column.tl().x));
         }
 
         //for (int j = 0; j < potWsRects.size(); j++) {

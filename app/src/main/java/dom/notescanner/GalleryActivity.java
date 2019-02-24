@@ -39,7 +39,7 @@ public class GalleryActivity extends AppCompatActivity {
     private static final String TAG = "GalleryActivity";
     ImageView imgPrevView;
     Button cancelButton, acceptButton;
-    CheckBox linesCButton;
+    CheckBox linesCB, segCB;
     TextView loadingTV;
     Uri uri;
     boolean isCamera;
@@ -54,10 +54,12 @@ public class GalleryActivity extends AppCompatActivity {
         imgPrevView = findViewById(R.id.image_view);
         cancelButton = findViewById(R.id.cancelButton);
         acceptButton = findViewById(R.id.acceptButton);
-        linesCButton = findViewById(R.id.linesCButton);
+        linesCB = findViewById(R.id.linesCButton);
+        segCB = findViewById(R.id.segmentCB);
         loadingTV = findViewById(R.id.loadingTV);
 
-        linesCButton.setClickable(false);
+        linesCB.setClickable(false);
+        segCB.setClickable(false);
         acceptButton.setClickable(false);
 
         Bundle bundle = getIntent().getExtras();
@@ -84,25 +86,28 @@ public class GalleryActivity extends AppCompatActivity {
                 onBackPressed();
                 break;
             case R.id.linesCButton:
-                if (linesCButton.isClickable()) {
+                if (linesCB.isClickable())
                     startPreProcessing();
-                }
+                break;
+            case R.id.segmentCB:
+                if (segCB.isClickable())
+                    startPreProcessing();
                 break;
         }
     }
 
     private void startPreProcessing() {
-        linesCButton.setClickable(false);
+        linesCB.setClickable(false);
         acceptButton.setClickable(false);
-        linesCButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
+        linesCB.setTextColor(getResources().getColor(R.color.colorTextGrey));
         acceptButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
         loadingTV.setText(getResources().getString(R.string.text_processing));
         if (isCamera) {
-            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, linesCButton.isChecked());
+            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, linesCB.isChecked(), segCB.isChecked());
             a.execute();
             //new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines).execute();
         } else {
-            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, linesCButton.isChecked());
+            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, linesCB.isChecked(), segCB.isChecked());
             a.execute();
            // new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines).execute();
         }
@@ -119,8 +124,10 @@ public class GalleryActivity extends AppCompatActivity {
     }
 
     public void enableButtons() {
-        linesCButton.setClickable(true);
-        linesCButton.setTextColor(getResources().getColor(R.color.colorText));
+        linesCB.setClickable(true);
+        linesCB.setTextColor(getResources().getColor(R.color.colorText));
+        segCB.setClickable(true);
+        segCB.setTextColor(getResources().getColor(R.color.colorText));
         acceptButton.setClickable(true);
         acceptButton.setTextColor(getResources().getColor(R.color.colorText));
         loadingTV.setText(getResources().getString(R.string.text_processed));
@@ -150,14 +157,15 @@ public class GalleryActivity extends AppCompatActivity {
         private Uri mUri;   //URI of  the image
         Bitmap inputBitmap; //Bitmap of the Image
         Mat displayMat;   //final Matrix to display to view back in Gallery
-        Boolean removeLines;
+        Boolean removeLines, showSegLines;
 
 
-        PreProcImgAsync(Uri uri, Bitmap cameraImage, final Context appContext, GalleryActivity myActivity, boolean removeLines) {
+        PreProcImgAsync(Uri uri, Bitmap cameraImage, final Context appContext, GalleryActivity myActivity, boolean removeLines, boolean segLines) {
             mUri = uri;
             weakActivity = new WeakReference<>(myActivity);
             mAppContext = new WeakReference<>(appContext);
             this.removeLines = removeLines;
+            this.showSegLines = segLines;
             inputBitmap = cameraImage;
         }
 
@@ -231,7 +239,7 @@ public class GalleryActivity extends AppCompatActivity {
             //}
 
             //Mat tmp = ocrProc.displayTextRegions(noiseMat, mergedTextRegions);
-            Mat tmp = ocrProc.displayTextRegions2(noiseMat, words);
+            Mat tmp = ocrProc.displayTextRegions2(noiseMat, words, showSegLines);
             displayMat = new Mat();
             displayMat = tmp.clone();       //display regions to matrix
             tmp.release();

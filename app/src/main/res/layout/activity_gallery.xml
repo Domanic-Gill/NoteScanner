@@ -39,16 +39,32 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="0.05"
-        android:paddingLeft="15dp">
+        android:orientation="horizontal"
+        android:paddingLeft="30dp"
+        android:paddingRight="15dp">
+
         <CheckBox
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:id="@+id/linesCButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.5"
+            android:paddingRight="20dp"
             android:checked="false"
             android:clickable="false"
             android:onClick="onClick"
-            android:textColor="@color/colorTextGrey"
-            android:id="@+id/linesCButton"
-            android:text="Remove lines"/>
+            android:text="Remove lines"
+            android:textColor="@color/colorTextGrey" />
+
+        <CheckBox
+            android:id="@+id/segmentCB"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.5"
+            android:checked="false"
+            android:clickable="false"
+            android:onClick="onClick"
+            android:text="Segment words"
+            android:textColor="@color/colorTextGrey" />
 
     </LinearLayout>
 
