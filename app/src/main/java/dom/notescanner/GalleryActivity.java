@@ -22,6 +22,7 @@ import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
@@ -33,6 +34,10 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.opencv.core.Core.bitwise_not;
+import static org.opencv.core.Core.countNonZero;
+import static org.opencv.core.Core.line;
 
 public class GalleryActivity extends AppCompatActivity {
 
@@ -195,14 +200,14 @@ public class GalleryActivity extends AppCompatActivity {
             Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
             OcrProcessor ocrProc = new OcrProcessor(inMat);
 
-            /*Thread z = null;
+            Thread z = null;
             Runnable r = null;
             appCon = mAppContext.get();
             if (appCon != null) {
                 r = new SvmLoader(ocrProc, appCon);
                 z = new Thread(r);
                 z.start();
-            }*/
+            }
 
             Mat scaleMat = ocrProc.scaleMat(inMat);     //downscale any high resolution images
             inMat.release();                            //release original image from memory.
@@ -239,7 +244,7 @@ public class GalleryActivity extends AppCompatActivity {
             //}
 
             //Mat tmp = ocrProc.displayTextRegions(noiseMat, mergedTextRegions);
-            Mat tmp = ocrProc.displayTextRegions2(noiseMat, words, showSegLines);
+            Mat tmp = ocrProc.displayTextRegions2(noiseMat.clone(), words, showSegLines);
             displayMat = new Mat();
             displayMat = tmp.clone();       //display regions to matrix
             tmp.release();
@@ -250,13 +255,103 @@ public class GalleryActivity extends AppCompatActivity {
 
             //displayMat = noiseMat;
 
-            /*Mat sneak = new Mat();
+
+            char[] lexicon = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1',
+                    '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'a', 'b', 'c', };
+
+            int lSegLine, rSegLine;
+            StringBuilder finalText = new StringBuilder();
+
+            /*try {
+                z.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            CvSVM svm = ((SvmLoader) r).getSvm();
+
+            for (int i = 0; i < words.size(); i++) {            //cycle through each word
+                Rect wordRegion = words.get(i).getWord();
+                List<Integer> segmentLines = words.get(i).getSegColumns();
+
+                for (int j = 0; j < segmentLines.size(); j++) {     //cycle through each character
+                    lSegLine = segmentLines.get(j);
+                    rSegLine = j + 1 == segmentLines.size() ? (int) wordRegion.br().x : segmentLines.get(j + 1);
+
+                    Rect charRegion = new Rect(new Point(lSegLine, wordRegion.tl().y), new Point(rSegLine, wordRegion.br().y));
+                    Mat charMatSub = noiseMat.submat(charRegion);
+
+                    Mat charMat = new Mat();
+                    charMatSub.copyTo(charMat);
+
+                    Imgproc.resize(charMat, charMat, new Size(24,24));
+                    Imgproc.threshold(charMat, charMat, 128, 1, Imgproc.THRESH_BINARY);
+                    bitwise_not(charMat, charMat);
+                    Imgproc.threshold(charMat, charMat, 254, 1, Imgproc.THRESH_BINARY);
+                    Mat charmatVector = Mat.zeros(new Size(28,28), CvType.CV_8U);
+                    charMat.copyTo(charmatVector.submat(new Rect(2 ,2 ,charMat.cols(), charMat.rows())));
+
+                    charmatVector.convertTo(charmatVector, CvType.CV_32FC1);
+                    Mat svmInput = charmatVector.reshape(1,1);
+                    double prediction = svm.predict(svmInput);
+                    finalText.append(lexicon[(int) prediction - 1]);
+                }
+
+                if (words.get(i).getLineBreak()) {
+                    finalText.append('\n');
+                } else {
+                    finalText.append(' ');
+                }
+            }
+
+            System.out.println(finalText.toString());*/
+
+            Rect roi = words.get(4).getWord();
+            List<Integer> lines = words.get(4).getSegColumns();
+            Rect charroi = new Rect(new Point(lines.get(1), roi.tl().y), new Point(lines.get(2), roi.br().y));
+            Mat cropped = new Mat(noiseMat, charroi);
+
+            Mat sneak = new Mat();
             cropped.copyTo(sneak);
-            Imgproc.resize(sneak, sneak, new Size(28,28));  //resize to SVM dimensions
-            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY); //invert matrix for the SVM
-            Imgproc.dilate(sneak, sneak, Mat.ones(new Size(2, 2), 0));
-            sneak.convertTo(sneak, CvType.CV_32FC1);    //Convert to floating point as SVM requires floating point values.
-            Mat fin = sneak.reshape(1,1);   //convert into one dimensional matrix for SVM to read
+            //Imgproc.resize(sneak, sneak, new Size(24,24));
+            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY);
+            bitwise_not(sneak, sneak);
+            Imgproc.threshold(sneak, sneak, 254, 1, Imgproc.THRESH_BINARY);
+            //bitwise_not(sneak,sneak);
+
+            int topCrop = 0, botCrop = 0;
+
+            for (int i = 0; i < sneak.rows(); i++) {
+                if (countNonZero(sneak.row(i)) == 0) {
+                    topCrop++;
+                } else if ((sneak.cols() / countNonZero(sneak.row(i))) * 100 < 5) {
+                    topCrop++;
+                } else {
+                    break;
+                }
+            }
+
+            for (int i = sneak.rows()-1; i > 0; i--) {
+                if (countNonZero(sneak.row(i)) == 0) {
+                    botCrop++;
+                } else if ((sneak.cols() / countNonZero(sneak.row(i))) * 100 < 5) {
+                    botCrop++;
+                } else {
+                    break;
+                }
+            }
+            Rect vertCropROI = new Rect(new Point(0, topCrop), new Point(cropped.cols()-1, cropped.rows() - botCrop));
+            Mat vertCrop = new Mat(sneak, vertCropROI);
+            Imgproc.resize(vertCrop, vertCrop, new Size(24,24));
+            System.out.println("----\n" + vertCrop.dump());
+
+            Mat n = Mat.zeros(new Size(28,28), CvType.CV_8U);
+            vertCrop.copyTo(n.submat(new Rect(2 ,2 ,vertCrop.cols(), vertCrop.rows())));
+            System.out.println(n.dump());
+
+            n.convertTo(n, CvType.CV_32FC1);
+            Mat fin = n.reshape(1,1);
 
             long time = System.currentTimeMillis();
             try {
@@ -271,8 +366,7 @@ public class GalleryActivity extends AppCompatActivity {
             Log.d(TAG, "ASYNC SVM = " + svm.get_support_vector_count());
             double f = svm.predict(fin);
 
-            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + f);
-            System.out.println(sneak.dump());*/
+            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + lexicon[(int) f - 1]);
 
             return null;
         }
