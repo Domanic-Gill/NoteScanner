@@ -11,7 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.80"
+        android:layout_weight="0.8"
         android:orientation="vertical"
         android:gravity="center"
         android:padding="5dp">
@@ -27,6 +27,8 @@
         <ImageView
             android:id="@+id/image_view"
             android:layout_width="wrap_content"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
             android:layout_height="match_parent"
             android:layout_gravity="center_vertical"
             android:contentDescription="Loading Image..."
@@ -37,7 +39,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="5dp"
         android:layout_weight="0.05"
         android:orientation="horizontal"
         android:paddingLeft="30dp"
@@ -47,8 +49,8 @@
             android:id="@+id/linesCButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5"
-            android:paddingRight="20dp"
+            android:layout_weight="0.33"
+            android:paddingRight="10dp"
             android:checked="false"
             android:clickable="false"
             android:onClick="onClick"
@@ -56,10 +58,23 @@
             android:textColor="@color/colorTextGrey" />
 
         <CheckBox
+            android:id="@+id/CButton_morph"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.33"
+            android:paddingRight="0dp"
+            android:checked="false"
+            android:clickable="false"
+            android:onClick="onClick"
+            android:text="Wide text regions"
+            android:textColor="@color/colorTextGrey" />
+
+        <CheckBox
             android:id="@+id/segmentCB"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="0.5"
+            android:layout_weight="0.33"
+            android:paddingRight="10dp"
             android:checked="false"
             android:clickable="false"
             android:onClick="onClick"

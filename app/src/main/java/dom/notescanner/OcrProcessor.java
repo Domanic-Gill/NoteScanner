@@ -123,7 +123,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
-        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(MORPHSHIFT_HIGH, 1)); //TODO: higher res = lower width,
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(35, 1)); //TODO: higher res = lower width,
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
 
 
@@ -146,7 +146,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
             if (rect.height > 16 && rect.width > 12)            //Check not to accept very small regions
                 textRegions.add(rect);
         }
-
+ 
         Collections.sort(textRegions, new Comparator<Rect>() {
             @Override
             public int compare(Rect a, Rect b) {    //Sort regions by height
