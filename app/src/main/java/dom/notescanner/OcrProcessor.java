@@ -123,7 +123,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
 
         Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
-        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(35, 1)); //TODO: higher res = lower width,
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(35, 1)); //TODO: higher res = lower width,  35 FOR EXTREME
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
 
 
@@ -367,6 +367,65 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         //    Core.line(src, new Point(i, aword.getWord().tl().y), new Point(i, aword.getWord().br().y), new Scalar(0, 0, 255));
         // }
         return segLines;
+    }
+
+    Mat preProcessLetter(Mat src) {
+        int topCrop = 0, botCrop = 0;   //amount of whitespace to crop off vertically
+        int scaleCols, scaleRows;       //dimensions of the scaled cropped matrix
+        int paddingCols, paddingRows;   //padding to center the cropped matrix into the new one
+        float aspectRatio;              //ratio to scale character correctly
+        Mat vertCrop;                   //Matrix containing the vertically cropped character
+        Mat dst;                        //Final 28x28 matrix to return
+        Mat tmp = src.clone();
+
+        /* Threshold to true binary and invert as SVM was trained inverted */
+        Imgproc.threshold(tmp, tmp, 128, 1, Imgproc.THRESH_BINARY);
+        bitwise_not(tmp, tmp);
+        Imgproc.threshold(tmp, tmp, 254, 1, Imgproc.THRESH_BINARY);
+
+        /*Cycle through top rows till the character region is found */
+        for (int i = 0; i < tmp.rows(); i++) {      //loop to
+            if (countNonZero(tmp.row(i)) == 0) {
+                topCrop++;
+            } else if ((tmp.cols() / countNonZero(tmp.row(i))) * 100 < 5) {
+                topCrop++;
+            } else {
+                break;
+            }
+        }
+
+        /* Cycle through bottom rows till character region is found */
+        for (int i = tmp.rows()-1; i > 0; i--) {
+            if (countNonZero(tmp.row(i)) == 0) {
+                botCrop++;
+            } else if ((tmp.cols() / countNonZero(tmp.row(i))) * 100 < 5) {
+                botCrop++;
+            } else {
+                break;
+            }
+        }
+
+        /* New matrix of the cropped region is made */
+        Rect vertCropROI = new Rect(new Point(0, topCrop), new Point(tmp.cols()-1, tmp.rows() - botCrop));
+        vertCrop = new Mat(tmp, vertCropROI);
+
+        /* Aspect ratio used to scale rows and columns to 24x24 correctly */
+        aspectRatio = (float) vertCrop.cols() / (float) vertCrop.rows();
+        scaleCols = (aspectRatio >= 1) ? 24 : (int) ((float) 24 * aspectRatio);
+        scaleRows = (aspectRatio <= 1) ? 24 : (int) ((float) 24 / aspectRatio);
+        if (scaleCols < 3) scaleCols = 3;
+        if (scaleRows < 3) scaleRows = 3;
+        Imgproc.resize(vertCrop, vertCrop, new Size(scaleCols,scaleRows));
+
+        /* Padding used to center the cropped matrix into a bigger matrix */
+        paddingCols = (28-scaleCols) / 2;
+        paddingRows = (28-scaleRows) / 2;
+        dst = Mat.zeros(new Size(28,28), CvType.CV_8U);
+        vertCrop.copyTo(dst.submat(new Rect(paddingCols ,paddingRows ,vertCrop.cols(), vertCrop.rows())));
+        dst.convertTo(dst, CvType.CV_32FC1);    //SVM only works on floating point vectors
+        vertCrop.release();
+
+        return dst;
     }
 
     /**

@@ -263,7 +263,7 @@ public class GalleryActivity extends AppCompatActivity {
             int lSegLine, rSegLine;
             StringBuilder finalText = new StringBuilder();
 
-            /*try {
+            try {
                 z.join();
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -281,19 +281,10 @@ public class GalleryActivity extends AppCompatActivity {
 
                     Rect charRegion = new Rect(new Point(lSegLine, wordRegion.tl().y), new Point(rSegLine, wordRegion.br().y));
                     Mat charMatSub = noiseMat.submat(charRegion);
-
                     Mat charMat = new Mat();
                     charMatSub.copyTo(charMat);
-
-                    Imgproc.resize(charMat, charMat, new Size(24,24));
-                    Imgproc.threshold(charMat, charMat, 128, 1, Imgproc.THRESH_BINARY);
-                    bitwise_not(charMat, charMat);
-                    Imgproc.threshold(charMat, charMat, 254, 1, Imgproc.THRESH_BINARY);
-                    Mat charmatVector = Mat.zeros(new Size(28,28), CvType.CV_8U);
-                    charMat.copyTo(charmatVector.submat(new Rect(2 ,2 ,charMat.cols(), charMat.rows())));
-
-                    charmatVector.convertTo(charmatVector, CvType.CV_32FC1);
-                    Mat svmInput = charmatVector.reshape(1,1);
+                    Mat charMatVector = ocrProc.preProcessLetter(charMat);
+                    Mat svmInput = charMatVector.reshape(1,1);
                     double prediction = svm.predict(svmInput);
                     finalText.append(lexicon[(int) prediction - 1]);
                 }
@@ -305,68 +296,16 @@ public class GalleryActivity extends AppCompatActivity {
                 }
             }
 
-            System.out.println(finalText.toString());*/
+            System.out.println(finalText.toString());
 
-            Rect roi = words.get(1).getWord();
+            /*Rect roi = words.get(1).getWord();
             List<Integer> lines = words.get(1).getSegColumns();
-            Rect charroi = new Rect(new Point(lines.get(3), roi.tl().y), new Point(lines.get(4), roi.br().y));
+            Rect charroi = new Rect(new Point(lines.get(0), roi.tl().y), new Point(lines.get(1), roi.br().y));
             Mat cropped = new Mat(noiseMat, charroi);
 
             Mat sneak = new Mat();
             cropped.copyTo(sneak);
-
-            Imgproc.threshold(sneak, sneak, 128, 1, Imgproc.THRESH_BINARY);
-            bitwise_not(sneak, sneak);
-            Imgproc.threshold(sneak, sneak, 254, 1, Imgproc.THRESH_BINARY);
-
-            int topCrop = 0, botCrop = 0;
-
-            for (int i = 0; i < sneak.rows(); i++) {
-                if (countNonZero(sneak.row(i)) == 0) {
-                    topCrop++;
-                } else if ((sneak.cols() / countNonZero(sneak.row(i))) * 100 < 5) {
-                    topCrop++;
-                } else {
-                    break;
-                }
-            }
-
-            for (int i = sneak.rows()-1; i > 0; i--) {
-                if (countNonZero(sneak.row(i)) == 0) {
-                    botCrop++;
-                } else if ((sneak.cols() / countNonZero(sneak.row(i))) * 100 < 5) {
-                    botCrop++;
-                } else {
-                    break;
-                }
-            }
-            Rect vertCropROI = new Rect(new Point(0, topCrop), new Point(cropped.cols()-1, cropped.rows() - botCrop));
-            Mat vertCrop = new Mat(sneak, vertCropROI);
-
-            int scaleCols = 0, scaleRows = 0;
-            float aspectRatio = (float) vertCrop.cols() / (float) vertCrop.rows();
-            System.out.println("AR = " + aspectRatio + "| dims = " + vertCrop.cols() + "x" + vertCrop.rows());
-            if (aspectRatio >= 1.0) {
-                scaleCols = 24;
-                scaleRows = (int) ((float) 24 /  aspectRatio);
-            } else {
-                scaleCols = (int) ((float) 24 * aspectRatio);
-            }
-
-            if (scaleCols < 3) scaleCols = 3;
-            if (scaleRows < 3) scaleRows = 3;
-
-            System.out.println("scalecol = " + scaleCols + "x" + scaleRows);
-
-            Imgproc.resize(vertCrop, vertCrop, new Size(scaleCols,scaleRows));
-
-            int paddingCols = (28-scaleCols) / 2, paddingRows = (28-scaleRows)/2;
-
-            Mat n = Mat.zeros(new Size(28,28), CvType.CV_8U);
-            vertCrop.copyTo(n.submat(new Rect(paddingCols ,paddingRows ,vertCrop.cols(), vertCrop.rows())));
-            System.out.println(n.dump());
-
-            n.convertTo(n, CvType.CV_32FC1);
+            Mat n = ocrProc.preProcessLetter(sneak);
             Mat fin = n.reshape(1,1);
 
             long time = System.currentTimeMillis();
@@ -382,7 +321,7 @@ public class GalleryActivity extends AppCompatActivity {
             Log.d(TAG, "ASYNC SVM = " + svm.get_support_vector_count());
             double f = svm.predict(fin);
 
-            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + lexicon[(int) f - 1]);
+            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + lexicon[(int) f - 1]);*/
 
             return null;
         }
