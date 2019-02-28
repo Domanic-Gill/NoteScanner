@@ -46,7 +46,7 @@
         android:paddingRight="15dp">
 
         <CheckBox
-            android:id="@+id/linesCButton"
+            android:id="@+id/CB_lines"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="0.33"
@@ -58,7 +58,7 @@
             android:textColor="@color/colorTextGrey" />
 
         <CheckBox
-            android:id="@+id/CButton_morph"
+            android:id="@+id/CB_morph"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="0.33"
@@ -70,7 +70,7 @@
             android:textColor="@color/colorTextGrey" />
 
         <CheckBox
-            android:id="@+id/segmentCB"
+            android:id="@+id/CB_segment"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="0.33"

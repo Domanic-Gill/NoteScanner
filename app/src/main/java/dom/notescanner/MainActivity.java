@@ -1,6 +1,9 @@
 package dom.notescanner;
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -8,6 +11,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
@@ -31,12 +35,19 @@ import com.github.clans.fab.FloatingActionMenu;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.ml.CvSVM;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /*LOAD SVM ON THE FIRST NOTE TAKE, PASS BACK TO ACTIVITY
  * THEN KEEP THE REFERENCE AS LONG AS IT ISN'T NULL
@@ -45,7 +56,7 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
-    public static final int GAL_IMAGE=42, CAM_IMAGE=43, CAM_REQUEST=44, NOTE_ACT=45; //Request codes
+    public static final int GAL_IMAGE=42, CAM_IMAGE=43, CAM_REQUEST=44, NOTE_ACT=45, ICR_START = 46; //Request codes
     private int lastNoteID = 0;                     //id of the final note of the ListView
     private String mCurrentPhotoPath;               //file path of new temporary file
     boolean openCVLoaded;
@@ -164,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(MainActivity.this, GalleryActivity.class);
                 intent.putExtra("uri", uri.toString());
                 intent.putExtra("isCamImg", false);
-                startActivity(intent);
+                startActivityForResult(intent, ICR_START);
             }
         } else if (requestCode == CAM_IMAGE) {      //returning from camera, start intent with img
             if (resultCode == RESULT_CANCELED) {    //delete temp file if no image found.
@@ -174,8 +185,38 @@ public class MainActivity extends AppCompatActivity {
                 Intent camIntent = new Intent(MainActivity.this, GalleryActivity.class);
                 camIntent.putExtra("isCamImg", true);
                 camIntent.putExtra("uri", mCurrentPhotoPath);
-                startActivity(camIntent);
+                startActivityForResult(camIntent, ICR_START);
             }
+        } else if (requestCode == ICR_START && resultCode == RESULT_OK) {   //start ICR pipeline on gallery accept
+            Bundle b = data.getExtras();
+            Uri uri = null;
+            Bitmap camPhoto = null;
+            Boolean isCamImg = b.getBoolean("isCamImg"),
+                    remLines = b.getBoolean("removeLines"),
+                    morphWord = b.getBoolean("wideText");
+            System.out.println(" HI " + remLines + "hi" + morphWord);
+            if (b != null) {
+                if (isCamImg) {
+                    uri = Uri.parse(b.getString("uri"));
+                    camPhoto = BitmapFactory.decodeFile(uri.toString());
+                } else {
+                    camPhoto = null;
+                    uri = Uri.parse(b.getString("uri"));
+                }
+            }
+            ContentValues newNote = new ContentValues();
+            newNote.put(ConProviderContract.NOTE_TITLE, "Processing new ICR note...");
+            newNote.put(ConProviderContract.NOTE_BODY, "Processing...");
+            getContentResolver().insert(ConProviderContract.NOTES_URI, newNote);
+
+            queryProvider();
+
+            if (isCamImg) {
+                new IcrAsync(null, camPhoto, getApplicationContext(), this, remLines, morphWord, lastNoteID).execute();
+            } else {
+                new IcrAsync(uri, null, getApplicationContext(), this, remLines, morphWord, lastNoteID).execute();
+            }
+
         }
     }
 
@@ -284,6 +325,172 @@ public class MainActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         floatingActionMenu.close(false);
+    }
+
+    static class IcrAsync extends AsyncTask<String, Mat, Void>  //weak reference and strong app context needs to be passed
+    {
+        private static final String TAG = "MAIN-ASYNC";  //debug tag
+        private final WeakReference<MainActivity> weakActivity;  //weak reference to activity
+        private final WeakReference<Context> mAppContext;   //weak reference to app, not needed but in main activity it is for writing to file without an activity
+        private Uri mUri;   //URI of  the image
+        private Bitmap inputBitmap; //Bitmap of the Image
+
+        private Boolean removeLines, morphWord;
+        private StringBuilder finalText;
+        private int noteID;
+
+
+        IcrAsync(Uri uri, Bitmap cameraImage, final Context appContext, MainActivity myActivity, boolean removeLines, boolean morphWord, int newNoteID) {
+            mUri = uri;
+            weakActivity = new WeakReference<>(myActivity);
+            mAppContext = new WeakReference<>(appContext);
+            this.removeLines = removeLines;
+            this.morphWord = morphWord;
+            inputBitmap = cameraImage;
+            noteID = newNoteID;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected Void doInBackground(String... params) {
+
+            System.out.println("HI IM AN MAIN ASYNC");
+
+            Mat inMat = new Mat();  //Image matrix
+            Context appCon;         //Strong reference to application context;
+
+            //get the bitmap from URI using app context
+            if (inputBitmap == null) {
+                appCon = mAppContext.get();
+                if (appCon != null) {
+                    try {
+                        inputBitmap = MediaStore.Images.Media.getBitmap(appCon.getContentResolver(), mUri);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
+            OcrProcessor ocrProc = new OcrProcessor(inMat);
+
+            Thread z = null;
+            SvmLoader r = null;
+            appCon = mAppContext.get();
+            if (appCon != null) {
+                r = new SvmLoader(ocrProc, appCon);
+                z = new Thread(r);
+                z.start();
+            }
+
+            Mat scaleMat = ocrProc.scaleMat(inMat);     //downscale any high resolution images
+            inMat.release();                            //release original image from memory.
+
+            Mat noiseMat = ocrProc.removeNoise(scaleMat, removeLines); //remove noise from Image
+
+            Mat textRegionMat = noiseMat.clone();
+            List<org.opencv.core.Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat, morphWord);    //retrieve regions of text
+            Log.d(TAG, textRegions.size() + "TEXT REGIONS DETECTED");
+
+            ArrayList<TextObject> words = ocrProc.generateTextObject(textRegions);
+
+            for (int i = 0; i < words.size(); i++) {
+                org.opencv.core.Rect wordRegion = words.get(i).getWord();
+                words.get(i).setSegColumns(ocrProc.segmentToLetters(wordRegion, noiseMat));
+            }
+
+            char[] lexicon = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1',
+                    '2', '3', '4', '5', '6', '7', '8', '9'};
+
+            int lSegLine, rSegLine;
+            finalText = new StringBuilder();
+
+            try {
+                z.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            CvSVM svm = r.getSvm();
+
+            for (int i = 0; i < words.size(); i++) {            //cycle through each word
+                org.opencv.core.Rect wordRegion = words.get(i).getWord();
+                List<Integer> segmentLines = words.get(i).getSegColumns();
+
+                for (int j = 0; j < segmentLines.size(); j++) {     //cycle through each character
+                    lSegLine = segmentLines.get(j);
+                    rSegLine = j + 1 == segmentLines.size() ? (int) wordRegion.br().x : segmentLines.get(j + 1);
+
+                    org.opencv.core.Rect charRegion = new org.opencv.core.Rect(new Point(lSegLine, wordRegion.tl().y), new Point(rSegLine, wordRegion.br().y));
+                    Mat charMatSub = noiseMat.submat(charRegion);   //THERE IS SOMETHING WRONG HERE, ERROR ONCE BUT IT WILL COME BACK
+                    Mat charMat = new Mat();
+                    charMatSub.copyTo(charMat);
+                    Mat charMatVector = ocrProc.preProcessLetter(charMat);
+                    Mat svmInput = charMatVector.reshape(1,1);
+                    double prediction = svm.predict(svmInput);
+                    finalText.append(lexicon[(int) prediction - 1]);
+                }
+
+                finalText.append(words.get(i).getLineBreak() ? '\n' : ' ');
+            }
+
+            if (appCon != null) {
+                ContentValues newNote = new ContentValues();
+                newNote.put(ConProviderContract.NOTE_TITLE, "New ICR note " + noteID);
+                newNote.put(ConProviderContract.NOTE_BODY, finalText.toString());
+                appCon.getContentResolver().update(ConProviderContract.NOTES_URI, newNote,
+                        ConProviderContract._ID + "=?",
+                        new String[]{String.valueOf(noteID)});
+            }
+
+            System.out.println("--------\n" + finalText.toString());
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            MainActivity activity = weakActivity.get(); //get strong reference to activity
+
+            if (activity == null || activity.isFinishing() || activity.isDestroyed())   //Don't update if activity not found;
+                return;
+
+            activity.queryProvider();       //update list view
+
+        }
+
+        @Override
+        protected void onProgressUpdate(Mat... values) {
+            super.onProgressUpdate(values);
+        }
+
+        @Override
+        protected void onCancelled() {
+            super.onCancelled();
+        }
+
+        class SvmLoader implements Runnable {
+            private OcrProcessor ocrProcessor;
+            private Context appContext;
+            CvSVM tsvm;
+
+            public SvmLoader(OcrProcessor o, Context c) {
+                ocrProcessor = o;
+                appContext = c;
+            }
+
+            public void run() {
+                tsvm = ocrProcessor.loadSVM(appContext);
+            }
+
+            public CvSVM getSvm() {
+                return tsvm;
+            }
+
+        }
     }
 }
 

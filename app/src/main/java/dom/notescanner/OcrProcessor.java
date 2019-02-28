@@ -42,8 +42,8 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     private boolean isDownscaled = false;
 
     /*PARAMETERS*/
-    private static final int MORPHSHIFT_LOW = 5, MORPHSHIFT_MED = 12, MORPHSHIFT_HIGH = 15; //used to be 6 12 18
-    private static final int[] NOISERED_LOW = {11, 2}, NOISERED_MED = {15, 5}, NOISERED_HIGH = {23, 7};
+    private static final int MORPHSHIFT_MED = 8, MORPHSHIFT_HIGH = 16, MORPHSHIFT_EXTREME = 32; //values for
+    private static final int[] NOISERED_HIGH = {23, 7};
 
     OcrProcessor(Mat m) {
         sourceCols = m.cols();
@@ -117,13 +117,13 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
     }
 
     /*find all the text regions in the input matrix using morphology and contouring*/
-    List<Rect> getTextRegionsRects(Mat m) { //TODO: pass bool iscancelled to stop rect loop
-
+    List<Rect> getTextRegionsRects(Mat m, boolean wideRegions) { //TODO: pass bool iscancelled to stop rect loop
+        int morhsize = (wideRegions) ? MORPHSHIFT_EXTREME : MORPHSHIFT_HIGH;
         List<Rect> textRegions = new ArrayList<>();
 
         Mat morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_GRADIENT, morphKern);
-        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(35, 1)); //TODO: higher res = lower width,  35 FOR EXTREME
+        morphKern = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(morhsize, 1)); //TODO: higher res = lower width,  35 FOR EXTREME
         Imgproc.morphologyEx(m, m, Imgproc.MORPH_CLOSE, morphKern);
 
 
@@ -369,7 +369,7 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         return segLines;
     }
 
-    Mat preProcessLetter(Mat src) {
+    public Mat preProcessLetter(Mat src) {
         int topCrop = 0, botCrop = 0;   //amount of whitespace to crop off vertically
         int scaleCols, scaleRows;       //dimensions of the scaled cropped matrix
         int paddingCols, paddingRows;   //padding to center the cropped matrix into the new one

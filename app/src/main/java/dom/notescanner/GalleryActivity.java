@@ -2,6 +2,7 @@ package dom.notescanner;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -44,8 +45,9 @@ public class GalleryActivity extends AppCompatActivity {
     private static final String TAG = "GalleryActivity";
     ImageView imgPrevView;
     Button cancelButton, acceptButton;
-    CheckBox linesCB, segCB;
+    CheckBox linesCB, segCB, morphCB;
     TextView loadingTV;
+    String sUri;
     Uri uri;
     boolean isCamera;
     Bitmap camPhoto;
@@ -59,16 +61,19 @@ public class GalleryActivity extends AppCompatActivity {
         imgPrevView = findViewById(R.id.image_view);
         cancelButton = findViewById(R.id.cancelButton);
         acceptButton = findViewById(R.id.acceptButton);
-        linesCB = findViewById(R.id.linesCButton);
-        segCB = findViewById(R.id.segmentCB);
+        linesCB = findViewById(R.id.CB_lines);
+        segCB = findViewById(R.id.CB_segment);
+        morphCB = findViewById(R.id.CB_morph);
         loadingTV = findViewById(R.id.loadingTV);
 
         linesCB.setClickable(false);
         segCB.setClickable(false);
         acceptButton.setClickable(false);
+        morphCB.setClickable(false);
 
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
+            sUri = bundle.getString("uri");
             isCamera = bundle.getBoolean("isCamImg");
             if (isCamera) {
                 uri = Uri.parse(bundle.getString("uri"));
@@ -86,16 +91,27 @@ public class GalleryActivity extends AppCompatActivity {
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.acceptButton:
+                Intent i = new Intent();
+                i.putExtra("removeLines", linesCB.isChecked());
+                i.putExtra("wideText",morphCB.isChecked());
+                i.putExtra("isCamImg", isCamera);
+                i.putExtra("uri", sUri);
+                setResult(RESULT_OK, i);
+                finish();
                 break;
             case R.id.cancelButton:
                 onBackPressed();
                 break;
-            case R.id.linesCButton:
+            case R.id.CB_lines:
                 if (linesCB.isClickable())
                     startPreProcessing();
                 break;
-            case R.id.segmentCB:
+            case R.id.CB_segment:
                 if (segCB.isClickable())
+                    startPreProcessing();
+                break;
+            case R.id.CB_morph:
+                if (morphCB.isClickable())
                     startPreProcessing();
                 break;
         }
@@ -104,15 +120,22 @@ public class GalleryActivity extends AppCompatActivity {
     private void startPreProcessing() {
         linesCB.setClickable(false);
         acceptButton.setClickable(false);
+        morphCB.setClickable(false);
+
         linesCB.setTextColor(getResources().getColor(R.color.colorTextGrey));
+        segCB.setTextColor(getResources().getColor(R.color.colorTextGrey));
+        morphCB.setTextColor(getResources().getColor(R.color.colorTextGrey));
         acceptButton.setTextColor(getResources().getColor(R.color.colorTextGrey));
+
         loadingTV.setText(getResources().getString(R.string.text_processing));
         if (isCamera) {
-            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, linesCB.isChecked(), segCB.isChecked());
+            a = new PreProcImgAsync(null, camPhoto, getApplicationContext(), this,
+                    linesCB.isChecked(), segCB.isChecked(), morphCB.isChecked());
             a.execute();
             //new PreProcImgAsync(null, camPhoto, getApplicationContext(), this, removeLines).execute();
         } else {
-            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this, linesCB.isChecked(), segCB.isChecked());
+            a =  new PreProcImgAsync(uri, null, getApplicationContext(), this,
+                    linesCB.isChecked(), segCB.isChecked(), morphCB.isChecked());
             a.execute();
            // new PreProcImgAsync(uri, null, getApplicationContext(), this, removeLines).execute();
         }
@@ -133,6 +156,8 @@ public class GalleryActivity extends AppCompatActivity {
         linesCB.setTextColor(getResources().getColor(R.color.colorText));
         segCB.setClickable(true);
         segCB.setTextColor(getResources().getColor(R.color.colorText));
+        morphCB.setClickable(true);
+        morphCB.setTextColor(getResources().getColor(R.color.colorText));
         acceptButton.setClickable(true);
         acceptButton.setTextColor(getResources().getColor(R.color.colorText));
         loadingTV.setText(getResources().getString(R.string.text_processed));
@@ -162,16 +187,17 @@ public class GalleryActivity extends AppCompatActivity {
         private Uri mUri;   //URI of  the image
         Bitmap inputBitmap; //Bitmap of the Image
         Mat displayMat;   //final Matrix to display to view back in Gallery
-        Boolean removeLines, showSegLines;
+        Boolean removeLines, showSegLines, isWideText;
 
 
-        PreProcImgAsync(Uri uri, Bitmap cameraImage, final Context appContext, GalleryActivity myActivity, boolean removeLines, boolean segLines) {
+        PreProcImgAsync(Uri uri, Bitmap cameraImage, final Context appContext, GalleryActivity myActivity, boolean removeLines, boolean segLines, boolean wideText) {
             mUri = uri;
             weakActivity = new WeakReference<>(myActivity);
             mAppContext = new WeakReference<>(appContext);
             this.removeLines = removeLines;
             this.showSegLines = segLines;
             inputBitmap = cameraImage;
+            isWideText = wideText;
         }
 
 
@@ -200,15 +226,6 @@ public class GalleryActivity extends AppCompatActivity {
             Utils.bitmapToMat(inputBitmap, inMat);  //change image to OpenCV matrix
             OcrProcessor ocrProc = new OcrProcessor(inMat);
 
-            Thread z = null;
-            Runnable r = null;
-            appCon = mAppContext.get();
-            if (appCon != null) {
-                r = new SvmLoader(ocrProc, appCon);
-                z = new Thread(r);
-                z.start();
-            }
-
             Mat scaleMat = ocrProc.scaleMat(inMat);     //downscale any high resolution images
             inMat.release();                            //release original image from memory.
 
@@ -217,19 +234,8 @@ public class GalleryActivity extends AppCompatActivity {
             Mat noiseMat = ocrProc.removeNoise(scaleMat, removeLines); //remove noise from Image
 
             Mat textRegionMat = noiseMat.clone();
-            List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat);    //retrieve regions of text
+            List<Rect> textRegions = ocrProc.getTextRegionsRects(textRegionMat, isWideText);    //retrieve regions of text
             Log.d(TAG, textRegions.size() + "TEXT REGIONS DETECTED");
-
-            /*if (textRegions.size() == 0) {      //WTF IS THIS DOING??
-                displayMat = noiseMat.clone();
-                Imgproc.cvtColor(displayMat, displayMat, Imgproc.COLOR_GRAY2BGR);
-            } else {
-                Mat tmp = ocrProc.displayTextRegions(noiseMat, textRegions);
-                displayMat = new Mat();
-                displayMat = tmp.clone();       //display regions to matrix
-                tmp.release();
-            }*/
-
 
             ArrayList<TextObject> words = ocrProc.generateTextObject(textRegions);
 
@@ -238,105 +244,25 @@ public class GalleryActivity extends AppCompatActivity {
                 words.get(i).setSegColumns(ocrProc.segmentToLetters(wordRegion, noiseMat));
             }
 
-            //List<Rect> mergedTextRegions = new ArrayList<>();
-            //for (TextObject word : words) {
-            //    mergedTextRegions.add(word.getWord());
-            //}
-
-            //Mat tmp = ocrProc.displayTextRegions(noiseMat, mergedTextRegions);
             Mat tmp = ocrProc.displayTextRegions2(noiseMat.clone(), words, showSegLines);
             displayMat = new Mat();
             displayMat = tmp.clone();       //display regions to matrix
             tmp.release();
-
-            //textRegionMat.release();
-           // noiseMat.release();
-           // textRegions.clear();
-
-            //displayMat = noiseMat;
-
-
-            char[] lexicon = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-                    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1',
-                    '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'a', 'b', 'c', };
-
-            int lSegLine, rSegLine;
-            StringBuilder finalText = new StringBuilder();
-
-            try {
-                z.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            CvSVM svm = ((SvmLoader) r).getSvm();
-
-            for (int i = 0; i < words.size(); i++) {            //cycle through each word
-                Rect wordRegion = words.get(i).getWord();
-                List<Integer> segmentLines = words.get(i).getSegColumns();
-
-                for (int j = 0; j < segmentLines.size(); j++) {     //cycle through each character
-                    lSegLine = segmentLines.get(j);
-                    rSegLine = j + 1 == segmentLines.size() ? (int) wordRegion.br().x : segmentLines.get(j + 1);
-
-                    Rect charRegion = new Rect(new Point(lSegLine, wordRegion.tl().y), new Point(rSegLine, wordRegion.br().y));
-                    Mat charMatSub = noiseMat.submat(charRegion);
-                    Mat charMat = new Mat();
-                    charMatSub.copyTo(charMat);
-                    Mat charMatVector = ocrProc.preProcessLetter(charMat);
-                    Mat svmInput = charMatVector.reshape(1,1);
-                    double prediction = svm.predict(svmInput);
-                    finalText.append(lexicon[(int) prediction - 1]);
-                }
-
-                if (words.get(i).getLineBreak()) {
-                    finalText.append('\n');
-                } else {
-                    finalText.append(' ');
-                }
-            }
-
-            System.out.println(finalText.toString());
-
-            /*Rect roi = words.get(1).getWord();
-            List<Integer> lines = words.get(1).getSegColumns();
-            Rect charroi = new Rect(new Point(lines.get(0), roi.tl().y), new Point(lines.get(1), roi.br().y));
-            Mat cropped = new Mat(noiseMat, charroi);
-
-            Mat sneak = new Mat();
-            cropped.copyTo(sneak);
-            Mat n = ocrProc.preProcessLetter(sneak);
-            Mat fin = n.reshape(1,1);
-
-            long time = System.currentTimeMillis();
-            try {
-                z.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            Log.d(TAG,"ASYNC WAITING TIME =  " + (float)((System.currentTimeMillis() - time) / 1000));
-            CvSVM svm = ((SvmLoader) r).getSvm();
-
-
-            Log.d(TAG, "ASYNC SVM = " + svm.get_support_vector_count());
-            double f = svm.predict(fin);
-
-            Log.d(TAG, "CROPPED " + sneak.rows() + "x" + sneak.cols() + "-" + sneak.isContinuous()+ "PREDICTION: " + lexicon[(int) f - 1]);*/
 
             return null;
         }
 
         @Override
         protected void onPostExecute(Void result) {
-            Activity activity = weakActivity.get(); //get strong reference to Gallery activity
+            GalleryActivity activity = weakActivity.get(); //get strong reference to Gallery activity
             boolean isRGB = displayMat.channels() > 1;
-            Log.d(TAG, "isrgb = " + isRGB);
+
             //Don't update if activity not found;
             if (activity == null || activity.isFinishing() || activity.isDestroyed())
                 return;
 
-            ((GalleryActivity) activity).displayMat(displayMat, isRGB);
-            ((GalleryActivity) activity).enableButtons();
+            activity.displayMat(displayMat, isRGB);
+            activity.enableButtons();
             displayMat.release();
 
         }
@@ -344,14 +270,14 @@ public class GalleryActivity extends AppCompatActivity {
         @Override
         protected void onProgressUpdate(Mat... values) {
             super.onProgressUpdate(values);
-            Activity activity = weakActivity.get(); //get strong reference to Gallery activity
+            GalleryActivity activity = weakActivity.get(); //get strong reference to Gallery activity
 
             // Don't update if activity not found
             if (activity == null || activity.isFinishing() || activity.isDestroyed())
                 return;
             //race condition check, possibility that mat is released before progress is updated
             if (values[0].cols() != 0 && values[0].rows() != 0)
-                ((GalleryActivity) activity).displayMat(values[0], true);
+                activity.displayMat(values[0], true);
         }
 
         @Override
