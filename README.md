@@ -4,9 +4,18 @@ Within this application lies the ability to select an image for a note, after wh
 
 The support vector machine was trained and tested extensively; training hyperparameters and performance evaluations have been. The application was made as a final year project at university. While the classification and overall pipeline accuracy is far from perfect, the foundations have clearly been laid. With further improvments and changes, the application will be published on the Google Play Store for anyone to use. Screenshots from the dissertation writeup can be found below.
 
-![Screen](docs/preview2.png)
-![Screen](docs/preview3.png)
-![Screen](docs/preview4.png)
-![Screen](docs/preview5.png)
-![Screen](docs/Preview1.png)
-
+<p align="center">
+  <img src='docs/preview2.png'>
+  
+  
+  <img src='docs/preview3.png'>
+  
+  
+  <img src='docs/preview4.png'>
+  
+  
+  <img src='docs/preview5.png'>
+  
+  
+  <img src='docs/Preview1.png'>
+</p>
