@@ -366,6 +366,15 @@ class OcrProcessor {    //TODO: Fix to be not package private, localise all meth
         //  for (int i : segLines){
         //    Core.line(src, new Point(i, aword.getWord().tl().y), new Point(i, aword.getWord().br().y), new Scalar(0, 0, 255));
         // }
+        if (segLines.size() == 0) {
+            segLines.add((int) word.tl().x);
+        }
+
+        int i = 5, j = 9;
+        if (segLines.get(0) > word.tl().x+10) {
+            segLines.add((int)word.tl().x);
+            Collections.sort(segLines);
+        }
         return segLines;
     }
 
